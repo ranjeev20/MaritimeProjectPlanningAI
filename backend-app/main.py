@@ -59,7 +59,10 @@ app = FastAPI(
 # CORS Middleware for Angular Frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Update with frontend URL in production
+    allow_origins=[
+        "http://localhost:4200",
+        "https://ranjeev20.github.io"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
