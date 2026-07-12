@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+sqlalchemy
+psycopg2-binary
+langgraph
+langchain
+langchain-openai
+mcp
+python-dotenv
+loguru
+alembic
+azure-storage-blob

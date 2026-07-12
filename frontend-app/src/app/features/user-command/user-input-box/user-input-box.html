@@ -1,0 +1,230 @@
+<div class="user-container">
+
+  <!-- <div class="welcome-section">
+    <h1>Hi Captain, <strong>Ready to Plan Projects?</strong></h1>
+  </div> -->
+
+  <div class="robot-illustration">
+    <!-- <div class="chat-bubble left">
+      <mat-icon class="bubble-icon">smart_toy</mat-icon> I can do your project planning.
+    </div> -->
+    <!-- <div class="robot">
+      <mat-icon class="robot-icon">smart_toy</mat-icon>
+    </div> -->
+    <!-- <div class="chat-bubble right">
+      <mat-icon class="bubble-icon">smart_toy</mat-icon> I can schedule inspections.
+    </div> -->
+  </div>
+
+  <div class="input-section-wrapper">
+    <div class="input-card">
+      <!-- <div class="pro-banner">
+        <div class="pro-text">
+          <mat-icon>auto_awesome</mat-icon> Unlock more with Pro Plan
+        </div>
+        <button class="pro-btn">Upgrade Now</button>
+      </div> -->
+
+      <div class="input-area">
+        <mat-icon class="input-prefix-icon">bolt</mat-icon>
+        <textarea
+          placeholder="Help me with a maritime project to plan (e.g., 'Dry dock maintenance for MV Horizon starting May 2026')..."
+          [(ngModel)]="query" cdkTextareaAutosize cdkAutosizeMinRows="1" cdkAutosizeMaxRows="5"
+          (keydown.enter)="submitQuery(); $event.preventDefault()">
+        </textarea>
+      </div>
+
+      <div class="input-actions">
+        <div class="left-actions">
+          <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;"
+            accept=".txt,.md,.pdf,.docx,.xlsx,.pptx" />
+          <button mat-button class="action-btn" (click)="fileInput.click()"><mat-icon>attach_file</mat-icon> Attach
+            File</button>
+          <span *ngIf="selectedFile" class="file-name"
+            style="font-size: 12px; color: #10b981; margin-left: 10px; display: inline-flex; align-items: center; gap: 4px;">
+            {{ selectedFile.name }}
+            <mat-icon (click)="clearFile(); $event.stopPropagation()"
+              style="cursor:pointer; font-size:14px; height:14px; width:14px;">close</mat-icon>
+          </span>
+          <!-- <button mat-button class="action-btn"><mat-icon>lightbulb</mat-icon> Reasoning</button>         
+          <button mat-button class="action-btn"><mat-icon>search</mat-icon> Deep Research</button> -->
+        </div>
+        <div class="right-actions">
+          <button mat-icon-button class="mic-btn"><mat-icon>mic</mat-icon></button>
+          <button mat-icon-button class="send-btn" (click)="submitQuery()"><mat-icon>send</mat-icon></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- <div class="suggestions" *ngIf="!interpretation() && !projectPlan() && !isInterpreting() && !isExecuting()">
+      @for (suggestion of suggestions; track suggestion.text) {
+        <button class="suggestion-chip" (click)="setQuery(suggestion.text)">
+          <mat-icon>{{suggestion.icon}}</mat-icon> {{suggestion.text}}
+        </button>
+      }
+    </div> -->
+
+    <!-- AI Output States -->
+    <div class="ai-output-section" *ngIf="isInterpreting() || isExecuting() || interpretation() || projectPlan()"
+      style="margin-top: 2rem;">
+
+      <div *ngIf="isInterpreting() || isExecuting()" class="modern-loading-state">
+        <div class="ai-spinner">
+          <div class="circle circle-1"></div>
+          <div class="circle circle-2"></div>
+          <mat-icon class="center-icon">auto_awesome</mat-icon>
+        </div>
+        <div class="loading-text-container">
+          <div class="loading-text-wrapper">
+            <span class="shimmer-text">{{ isInterpreting() ? 'Analyzing your Input. Please wait...' : 'Generating
+              detailed project plan' }}</span>
+            <span class="typing-dots">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="interpretation() && !isExecuting() && !projectPlan()" class="interpretation-card modern-card">
+        <div class="card-header">
+          <div class="header-title">
+            <div class="icon-wrapper">
+              <mat-icon class="header-icon">psychology</mat-icon>
+            </div>
+            <div class="header-text">
+              <h3>Interpretation Result</h3>
+              <div class="header-subtitle">Review the extracted project parameters</div>
+            </div>
+          </div>
+          <div class="action-badge">
+            <mat-icon class="badge-icon">auto_awesome</mat-icon>
+            <div class="badge-content">
+              <span class="badge-label">{{ interpretation()?.action }}</span>
+              <span class="badge-conf">{{ interpretation()?.confidence | percent }} Match</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dto-grid">
+          <div class="dto-item title-item">
+            <div class="dto-label"><mat-icon>label</mat-icon> Title</div>
+            <span class="dto-value">{{ interpretation()?.dto?.projectTitle || 'N/A' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>category</mat-icon> Project Type</div>
+            <span class="dto-value">{{ interpretation()?.dto?.projectType || 'N/A' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>directions_boat</mat-icon> Vessel</div>
+            <span class="dto-value">{{ interpretation()?.dto?.vesselName || 'N/A' }} ({{
+              interpretation()?.dto?.vesselType || 'N/A' }})</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>summarize</mat-icon> Scope Summary</div>
+            <span class="dto-value">{{ interpretation()?.dto?.scopeSummary || 'N/A' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>inventory_2</mat-icon> Work Packages</div>
+            <span class="dto-value">{{ interpretation()?.dto?.majorWorkPackages?.join(', ') || 'N/A' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>priority_high</mat-icon> Priority</div>
+            <span class="dto-value">{{ interpretation()?.dto?.priorityLevel || 'N/A' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>event</mat-icon> Start Date</div>
+            <span class="dto-value">{{ interpretation()?.dto?.plannedStartDate || 'N/A' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>schedule</mat-icon> Duration</div>
+            <span class="dto-value">{{ interpretation()?.dto?.durationWeeks || 0 }} Weeks</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>monetization_on</mat-icon> Budget</div>
+            <span class="dto-value highlight-value">{{ interpretation()?.dto?.budgetAtCompletion || 0 }} {{
+              interpretation()?.dto?.currency || 'USD' }}</span>
+          </div>
+          <div class="dto-item">
+            <div class="dto-label"><mat-icon>groups</mat-icon> Crew Size</div>
+            <span class="dto-value">{{ interpretation()?.dto?.crewSize || 0 }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="interpretation()?.action === 'NEEDS_CLARIFICATION'" class="clarification-alert"
+          style="margin-bottom: 24px; padding: 16px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; color: #d97706;">
+          <h4 style="margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;"><mat-icon>warning</mat-icon>
+            Clarification Required</h4>
+          <p style="margin: 0; font-size: 0.9rem;">The AI planner needs more information. Please provide the following
+            missing fields in your next message:</p>
+          <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
+            @for(field of interpretation()?.dto?.missingFields; track field) {
+            <span
+              style="background: rgba(245, 158, 11, 0.15); padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(245, 158, 11, 0.2);">{{
+              field }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn-accept" (click)="acceptQuery()"
+            [disabled]="interpretation()?.action === 'NEEDS_CLARIFICATION'"
+            [style.opacity]="interpretation()?.action === 'NEEDS_CLARIFICATION' ? '0.5' : '1'">
+            <mat-icon>check_circle</mat-icon> Accept & Plan
+          </button>
+          <button class="btn-reject" (click)="rejectQuery()">
+            <mat-icon>cancel</mat-icon> Reject
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="projectPlan()" class="plan-card modern-card">
+        <div class="card-header">
+          <div class="header-title">
+            <div class="icon-wrapper"
+              style="background: var(--success-light, #ecfdf5); border-color: var(--success-border, #a7f3d0);">
+              <mat-icon class="header-icon success-icon" style="color: #10b981;">assignment</mat-icon>
+            </div>
+            <div class="header-text">
+              <h3>Project Plan Generated</h3>
+              <div class="header-subtitle">{{ projectPlan()?.project_title }} ({{ projectPlan()?.total_duration_weeks }}
+                Weeks)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tasks-list">
+          @for (task of projectPlan()?.tasks; track task.summary) {
+          <div class="task-item">
+            <div class="task-header">
+              <h4>{{ task.summary }}</h4>
+              <span class="priority-badge">{{ task.priority }}</span>
+            </div>
+            <p class="task-desc">{{ task.description }}</p>
+            <div class="task-meta">
+              <span class="meta-item"><mat-icon>person</mat-icon> {{ task.assignee }}</span>
+              <span class="meta-item"><mat-icon>schedule</mat-icon> {{ task.original_estimate }}</span>
+            </div>
+          </div>
+          }
+        </div>
+        <div class="card-actions">
+          <button class="btn-accept" (click)="savePlan()">
+            <mat-icon>save</mat-icon> Save Plan
+          </button>
+          <button class="btn-secondary" style="margin-left: 10px;"
+            (click)="projectPlan.set(null); interpretation.set(null)">
+            <mat-icon>refresh</mat-icon> Start Over
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<style>
+  @keyframes spin {
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+</style>

@@ -1,0 +1,413 @@
+<div class="dashboard-wrapper">
+  <!-- Stepper Navigation -->
+  <div class="stepper-header">
+    <div class="step-indicator" [class.active]="stepperIndex === 0" [class.completed]="stepperIndex > 0"
+      (click)="setStep(0)">
+      <span class="step-num">1</span>
+      <span class="step-label">Select Template</span>
+    </div>
+    <div class="step-line" [class.active]="stepperIndex > 0"></div>
+
+    <div class="step-indicator" [class.active]="stepperIndex === 1" [class.completed]="stepperIndex > 1"
+      (click)="setStep(1)">
+      <span class="step-num">2</span>
+      <span class="step-label">Parameters & Subs</span>
+    </div>
+    <div class="step-line" [class.active]="stepperIndex > 1"></div>
+
+    <div class="step-indicator" [class.active]="stepperIndex === 2" [class.completed]="stepperIndex > 2"
+      (click)="setStep(2)">
+      <span class="step-num">3</span>
+      <span class="step-label">Shipyard Scopes</span>
+    </div>
+    <div class="step-line" [class.active]="stepperIndex > 2"></div>
+
+    <div class="step-indicator" [class.active]="stepperIndex === 3" (click)="setStep(3)">
+      <span class="step-num">4</span>
+      <span class="step-label">Compile & Export</span>
+    </div>
+  </div>
+
+  <div class="survey-content">
+
+    <!-- STEP 1: Select Template -->
+    <div *ngIf="stepperIndex === 0" class="step-container template-step">
+      <div class="section-intro">
+        <h3>Choose Tender Specification Document Template</h3>
+        <p>Select a pre-designed Word template (.docx) to generate tender Specification document for specific Client.
+          The
+          system will extract variables and populate details matching this format.</p>
+      </div>
+
+      <div class="templates-grid">
+        <div *ngFor="let tpl of templates" class="template-card"
+          [class.selected]="selectedTemplate?.filename === tpl.filename">
+          <div class="card-icon">
+            <mat-icon>description</mat-icon>
+          </div>
+          <h4>{{ tpl.name }}</h4>
+          <p class="filename">{{ tpl.filename }}</p>
+          <div class="template-metadata">
+            <span>Fields to configure: <b>{{ tpl.fields.length }}</b></span>
+          </div>
+          <div class="card-actions">
+            <button mat-raised-button class="primary-btn" (click)="selectTemplate(tpl)">
+              <mat-icon>check_circle</mat-icon> Use Template
+            </button>
+            <button mat-button class="secondary-btn" (click)="togglePreview(tpl)">
+              <mat-icon>visibility</mat-icon> View DOCX File
+            </button>
+            <button mat-button class="secondary-btn" (click)="downloadTemplate(tpl)">
+              <mat-icon>cloud_download</mat-icon> Download Raw DOCX
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Template Preview Section -->
+      <div *ngIf="previewingTemplate" class="template-preview-container">
+        <div class="preview-header">
+          <mat-icon>visibility</mat-icon>
+          <h4>Template DOCX File Preview: {{ previewingTemplate.name }}</h4>
+          <button mat-icon-button class="close-btn" (click)="togglePreview(null)">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="preview-body-docx">
+          <div *ngIf="isLoadingDocx" class="loading-container">
+            <mat-icon class="spinning">sync</mat-icon>
+            <span>Loading DOCX Document preview...</span>
+          </div>
+
+          <div id="docx-preview-container" class="docx-preview-pane"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Parameters & Subcontractors -->
+    <div *ngIf="stepperIndex === 1" class="step-container">
+      <div class="section-intro">
+        <h3>Document Parameters & Subcontractors</h3>
+        <p>Configure project schedule details, upload cover page photos, and manage subcontractors. These variables will
+          fill the document headers and index tables.</p>
+      </div>
+
+      <div class="params-grid">
+        <!-- Left: Text fields -->
+        <div class="params-column form-panel">
+          <h4>Vessel & Document Metadata</h4>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Company Name</label>
+              <input type="text" [(ngModel)]="companyName" placeholder="e.g. Van Oord Marine Ingenuity" />
+            </div>
+            <div class="form-group">
+              <label>Vessel Name</label>
+              <input type="text" [(ngModel)]="vesselName" placeholder="e.g. HAM 318" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Document Name</label>
+              <input type="text" [(ngModel)]="documentName" placeholder="e.g. 0318 - Tender Specification Document" />
+            </div>
+            <div class="form-group">
+              <label>Doc. ID/Number</label>
+              <input type="text" [(ngModel)]="docNr" placeholder="e.g. VOMS-PR3.07-SMD-IN-01-05" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Reference Number</label>
+              <input type="text" [(ngModel)]="reference" placeholder="e.g. VOMS-PR3.07-SMD-IN-01" />
+            </div>
+            <div class="form-group short">
+              <label>Revision</label>
+              <input type="text" [(ngModel)]="revision" placeholder="e.g. 1" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>ETA Arrival Date</label>
+              <input type="date" [(ngModel)]="arrivalDate" />
+            </div>
+            <div class="form-group short">
+              <label>Total Lead Time (Days)</label>
+              <input type="number" [(ngModel)]="totalLeadTime" />
+            </div>
+            <div class="form-group short">
+              <label>Drydock Duration (Days)</label>
+              <input type="number" [(ngModel)]="drydockDuration" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Images upload -->
+        <div class="params-column image-panel">
+          <h4>Embedded Layout Images</h4>
+
+          <!-- Company Logo Image Dropzone -->
+          <div class="image-uploader">
+            <span class="upload-label">Company Logo Image</span>
+            <div class="uploader-box" [class.has-file]="companyLogoBase64">
+              <input type="file" id="logoFileInput" (change)="onFileSelected($event, 'logo')" accept="image/*" />
+              <label for="logoFileInput">
+                <mat-icon *ngIf="!companyLogoBase64">business</mat-icon>
+                <img *ngIf="companyLogoBase64" [src]="companyLogoBase64" alt="Logo Preview" />
+                <span class="file-name">{{ companyLogoName ? companyLogoName : 'Select Company Logo Image' }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Cover Image Dropzone -->
+          <div class="image-uploader">
+            <span class="upload-label">Page 1 Cover Image</span>
+            <div class="uploader-box" [class.has-file]="coverImageBase64">
+              <input type="file" id="coverFileInput" (change)="onFileSelected($event, 'cover')" accept="image/*" />
+              <label for="coverFileInput">
+                <mat-icon *ngIf="!coverImageBase64">image</mat-icon>
+                <img *ngIf="coverImageBase64" [src]="coverImageBase64" alt="Cover Preview" />
+                <span class="file-name">{{ coverImageName ? coverImageName : 'Select Cover Page Photo' }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Interior Layout Image Dropzone -->
+          <div class="image-uploader">
+            <span class="upload-label">Vessel Interior Layout (Capacity/Dimensions)</span>
+            <div class="uploader-box" [class.has-file]="interiorImageBase64">
+              <input type="file" id="interiorFileInput" (change)="onFileSelected($event, 'interior')"
+                accept="image/*" />
+              <label for="interiorFileInput">
+                <mat-icon *ngIf="!interiorImageBase64">layers</mat-icon>
+                <img *ngIf="interiorImageBase64" [src]="interiorImageBase64" alt="Interior Preview" />
+                <span class="file-name">{{ interiorImageName ? interiorImageName : 'Select Interior Capacity Photo'
+                  }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom: Subcontractors manager -->
+      <div class="subcontractors-section">
+        <div class="section-header">
+          <mat-icon>supervised_user_circle</mat-icon>
+          <h4>Subcontractors Scope Management</h4>
+        </div>
+        <p class="section-desc">Manage major subcontractor works listed in the survey index tables and outlines.</p>
+
+        <table class="subs-table">
+          <thead>
+            <tr>
+              <th style="width: 80px;">Index</th>
+              <th>Scope of Works / Description</th>
+              <th>Subcontractor Name</th>
+              <th style="width: 80px;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let sub of subcontractors; let idx = index">
+              <td>{{ idx + 1 }}</td>
+              <td>{{ sub.scope_of_works }}</td>
+              <td>{{ sub.subcontractor }}</td>
+              <td>
+                <button mat-icon-button color="warn" (click)="removeSubcontractor(idx)" class="remove-btn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="subcontractors.length === 0">
+              <td colspan="4" class="empty-row">No subcontractors added yet. Use the fields below to add.</td>
+            </tr>
+            <!-- Adding Form Row -->
+            <tr class="add-row-form">
+              <td>Add</td>
+              <td>
+                <input type="text" [(ngModel)]="newSubScope" placeholder="e.g. Overhaul Main Engines" />
+              </td>
+              <td>
+                <input type="text" [(ngModel)]="newSubName" placeholder="e.g. Wartsila"
+                  (keyup.enter)="addSubcontractor()" />
+              </td>
+              <td>
+                <button mat-icon-button (click)="addSubcontractor()" class="add-row-btn"
+                  [disabled]="!newSubScope || !newSubName">
+                  <mat-icon>add_circle</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Navigation buttons -->
+      <div class="step-footer">
+        <button mat-button class="secondary-btn" (click)="prevStep()">
+          <mat-icon>arrow_back</mat-icon> Back to Templates
+        </button>
+        <button mat-raised-button class="primary-btn" (click)="nextStep()">
+          Next Step: Scopes <mat-icon>arrow_forward</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Shipyard Work Scopes -->
+    <div *ngIf="stepperIndex === 2" class="step-container">
+      <div class="section-intro">
+        <h3>Shipyard Scopes & LLM Descriptions</h3>
+        <p>Define shipyard work scope items (4.1, 4.2...). Provide inspection photos and leverage Gemini Vision AI to
+          generate short, crispy, and technical descriptions of work.</p>
+      </div>
+
+      <!-- Add Scope Item Header -->
+      <div class="add-scope-bar">
+        <input type="text" [(ngModel)]="newScopeTitle"
+          placeholder="Enter title or multiple titles separated by commas/semicolons (e.g. Painting of Hull; Overhaul Engines)..."
+          (keyup.enter)="addNewScope()" />
+        <button mat-raised-button class="primary-btn" (click)="addNewScope()" [disabled]="!newScopeTitle.trim()">
+          <mat-icon>add</mat-icon> Add Scope Item
+        </button>
+      </div>
+
+      <div *ngIf="shipyardScopes.length === 0" class="empty-scopes">
+        <mat-icon>assignment_late</mat-icon>
+        <p>No shipyard work scopes added yet. Enter a title above to start.</p>
+      </div>
+
+      <!-- List of Scopes -->
+      <div *ngIf="shipyardScopes.length > 0" class="scopes-list">
+        <div *ngFor="let item of shipyardScopes; let idx = index" class="scope-item-card">
+          <div class="card-head">
+            <div class="card-title-ref">
+              <span class="ref-badge">4.{{ idx + 1 }}</span>
+              <h5>{{ item.title }}</h5>
+            </div>
+
+            <div class="card-head-controls">
+              <select [(ngModel)]="item.status" class="status-select">
+                <option value="New">New</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+              </select>
+              <button mat-icon-button color="warn" (click)="removeScope(idx)" class="remove-btn">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Left Col: Image & AI Prompt -->
+            <div class="card-col media-col">
+              <div class="scope-image-uploader" [class.has-img]="item.image_base64">
+                <input type="file" [id]="'scopeFile_' + idx" (change)="onScopeFileSelected($event, item)"
+                  accept="image/*" />
+                <label [for]="'scopeFile_' + idx">
+                  <mat-icon *ngIf="!item.image_base64">photo_camera</mat-icon>
+                  <img *ngIf="item.image_base64" [src]="item.image_base64" alt="Scope Photo" />
+                  <span>{{ item.image_name ? item.image_name : 'Upload Inspection Photo' }}</span>
+                </label>
+              </div>
+
+              <div class="ai-prompt-group">
+                <label>Inspector Comments/Prompt Context:</label>
+                <textarea [(ngModel)]="item.promptCaption"
+                  placeholder="Provide damage context or repair scope instructions to guide Gemini AI..."></textarea>
+
+                <button mat-raised-button class="ai-btn" [disabled]="!item.image_base64 || item.isGeneratingAI"
+                  (click)="generateScopeDescription(item)">
+                  <mat-icon *ngIf="!item.isGeneratingAI">auto_awesome</mat-icon>
+                  <span *ngIf="item.isGeneratingAI">AI Working...</span>
+                  <span *ngIf="!item.isGeneratingAI">Generate Description (LLM)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right Col: Description & Checklists -->
+            <div class="card-col details-col">
+              <div class="description-group">
+                <label>Shipyard Description of Work (Editable):</label>
+                <textarea [(ngModel)]="item.description"
+                  placeholder="Gemini description will appear here, or you can write manually..."></textarea>
+              </div>
+
+              <!-- Categories Checkboxes -->
+              <div class="checklist-group">
+                <label>Work Categories Checklist:</label>
+                <div class="checkbox-grid">
+                  <label *ngFor="let cat of categoryOptions" class="checkbox-item">
+                    <input type="checkbox" [(ngModel)]="item.categories[cat]" />
+                    <span>{{ cat }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Safety Checklist -->
+              <div class="checklist-group">
+                <label>Safety & Permits Checklist:</label>
+                <div class="checkbox-grid">
+                  <label *ngFor="let permit of permitOptions" class="checkbox-item">
+                    <input type="checkbox" [(ngModel)]="item.permits[permit]" />
+                    <span>{{ permit }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation buttons -->
+      <div class="step-footer">
+        <button mat-button class="secondary-btn" (click)="prevStep()">
+          <mat-icon>arrow_back</mat-icon> Back to Parameters
+        </button>
+
+        <button mat-raised-button class="primary-btn compile-btn"
+          [disabled]="shipyardScopes.length === 0 || isGeneratingReport" (click)="compileReport()">
+          <mat-icon *ngIf="!isGeneratingReport">assessment</mat-icon>
+          <span *ngIf="isGeneratingReport">Compiling Document...</span>
+          <span *ngIf="!isGeneratingReport">Compile & Generate Tender Specification Document</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Compile & Export -->
+    <div *ngIf="stepperIndex === 3" class="step-container export-step">
+      <div class="export-success-card">
+        <mat-icon class="success-icon">check_circle</mat-icon>
+        <h3>Tender Specification Document Compiled Successfully!</h3>
+        <p class="subtitle">The template-driven Tender Specification Document has been generated in both editable Word
+          (.docx) format and structured PDF format. Select your download option below.</p>
+
+        <div class="export-actions">
+          <button mat-raised-button class="docx-export-btn" (click)="downloadDocx()">
+            <mat-icon>description</mat-icon>
+            <div class="btn-lbl-g roup">
+              <span class="main-lbl">Download Word Tender Specification Document</span>
+              <span class="sub-lbl">DOCX format (Review & Edit)</span>
+            </div>
+          </button>
+
+          <button mat-raised-button class="pdf-export-btn" (click)="downloadPdf()">
+            <mat-icon>picture_as_pdf</mat-icon>
+            <div class="btn-lbl-group">
+              <span class="main-lbl">Download PDF Tender Specification Document</span>
+              <span class="sub-lbl">PDF format (Final Version)</span>
+            </div>
+          </button>
+        </div>
+
+        <button mat-button class="secondary-btn go-back-btn" (click)="prevStep()">
+          <mat-icon>edit</mat-icon> Make Further Edits / Modifications
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>

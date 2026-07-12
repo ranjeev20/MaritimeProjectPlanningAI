@@ -1,0 +1,120 @@
+<div class="dashboard-wrapper">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div class="project-selector">
+      <mat-icon>assessment</mat-icon>
+      <select [(ngModel)]="selectedProject" (change)="onProjectChange()">
+        <option *ngFor="let p of projects" [value]="p">{{ p }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- KPI Top Row -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-title">MILESTONES</div>
+      <div class="kpi-value">{{ currentData.kpi.milestones }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">TASKS COMPLETED</div>
+      <div class="kpi-value">{{ currentData.kpi.tasksCompleted }} <span class="sub">/ {{ currentData.kpi.tasksCompleted + currentData.kpi.tasksPending }}</span></div>
+      <div class="progress-bar"><div class="fill" [style.width]="(currentData.kpi.tasksCompleted / (currentData.kpi.tasksCompleted + currentData.kpi.tasksPending)) * 100 + '%'"></div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">TOTAL RISKS</div>
+      <div class="kpi-value risk">{{ currentData.risks.low + currentData.risks.medium + currentData.risks.high }}</div>
+      <div class="kpi-subtext">H: {{currentData.risks.high}} | M: {{currentData.risks.medium}} | L: {{currentData.risks.low}}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">BUDGET USED ($)</div>
+      <div class="kpi-value">{{ currentData.kpi.budgetUsed | number }}</div>
+      <div class="kpi-subtext">Allocated: ${{ currentData.kpi.budgetAllocated | number }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">TEAM SIZE</div>
+      <div class="kpi-value">{{ currentData.kpi.teamSize }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">WORK HOURS</div>
+      <div class="kpi-value">{{ currentData.kpi.totalHours }} <span class="sub">hrs spent</span></div>
+      <div class="kpi-subtext">Planned: {{ currentData.kpi.plannedHours }} hrs</div>
+    </div>
+  </div>
+
+  <!-- Charts Middle Row -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Project Summary</h3>
+      <div class="view-controls" style="margin-top: -10px; margin-bottom: 15px;">
+        <button class="view-btn" [class.active]="currentViewMode === 'Day'" (click)="changeViewMode('Day')">Day</button>
+        <button class="view-btn" [class.active]="currentViewMode === 'Week'" (click)="changeViewMode('Week')">Week</button>
+        <button class="view-btn" [class.active]="currentViewMode === 'Month'" (click)="changeViewMode('Month')">Month</button>
+        <button class="view-btn" [class.active]="currentViewMode === 'Quarter'" (click)="changeViewMode('Quarter')">Quarter</button>
+        <button class="view-btn" [class.active]="currentViewMode === 'Year'" (click)="changeViewMode('Year')">Year</button>
+      </div>
+      <div class="chart-container">
+        <canvas #projectSummaryChart></canvas>
+        <div class="donut-center">{{ currentData.kpi.tasksCompleted + currentData.kpi.tasksPending }}</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Risk Status</h3>
+      <div class="chart-container">
+        <canvas #riskStatusChart></canvas>
+        <div class="donut-center">{{ currentData.risks.low + currentData.risks.medium + currentData.risks.high }}</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Category Wise Task Status</h3>
+      <div class="chart-container">
+        <canvas #taskCategoryChart></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Budget Vs Expense Ratio</h3>
+      <div class="budget-info">
+        <div class="budget-stat">
+          <span class="label">BUDGET</span>
+          <span class="val">{{ currentData.kpi.budgetAllocated | number }}</span>
+        </div>
+        <div class="budget-stat right">
+          <span class="label">EXPENSE</span>
+          <span class="val">{{ currentData.kpi.budgetUsed | number }}</span>
+        </div>
+      </div>
+      <div class="ratio-bar-container">
+         <span class="ratio-text">{{ getBudgetRatio() }}%</span>
+         <canvas #budgetRatioChart style="height: 20px;"></canvas>
+      </div>
+      <div class="budget-stat text-center" style="margin-top: 10px">
+        <span class="label">REMAINING BUDGET</span>
+        <span class="val" style="color: #10b981">${{ currentData.kpi.budgetRemaining | number }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task List Bottom Row -->
+  <div class="task-list-section">
+    <h3>Task Details (Including Work Hours)</h3>
+    <table class="task-table">
+      <thead>
+        <tr>
+          <th>Task Name</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Complexity</th>
+          <th>Hours Spent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let task of currentData.tasks">
+          <td>{{ task.name }}</td>
+          <td><span class="badge" [ngClass]="task.status.toLowerCase()">{{ task.status }}</span></td>
+          <td><span class="badge" [ngClass]="task.priority.toLowerCase()">{{ task.priority }}</span></td>
+          <td>{{ task.complexity }}</td>
+          <td class="hours-col"><strong>{{ task.hours }} hrs</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

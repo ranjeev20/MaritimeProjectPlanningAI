@@ -1,0 +1,239 @@
+<div class="settings-container">
+  <header class="page-header">
+    <h1>Settings</h1>
+    <p>Manage your account, preferences, and system settings.</p>
+  </header>
+
+  <div class="settings-layout">
+    <!-- Sidebar navigation -->
+    <nav class="settings-nav">
+      <ul>
+        <li [class.active]="activeTab === 'profile'" (click)="activeTab = 'profile'">
+          <mat-icon>account_circle</mat-icon> Your Profile
+        </li>
+        <li [class.active]="activeTab === 'appearance'" (click)="activeTab = 'appearance'">
+          <mat-icon>palette</mat-icon> Appearance
+        </li>
+        <li *ngIf="isProjectManager" [class.active]="activeTab === 'admin'" (click)="activeTab = 'admin'">
+          <mat-icon>manage_accounts</mat-icon> User Management
+        </li>
+        <li class="logout-nav-item" [class.active]="activeTab === 'logout'" (click)="activeTab = 'logout'">
+          <mat-icon>logout</mat-icon> Logout
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="settings-content">
+      <!-- User Details Section -->
+      <section class="settings-card user-profile" *ngIf="activeTab === 'profile'">
+        <div class="card-header">
+          <mat-icon>account_circle</mat-icon>
+          <h2>Your Profile</h2>
+        </div>
+        <div class="card-content">
+          <div class="detail-row">
+            <span class="label">Employee ID:</span>
+            <span class="value">{{ employee_id }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Name:</span>
+            <span class="value">{{ employee_name }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Email:</span>
+            <span class="value">{{ email }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Designation:</span>
+            <span class="value designation-badge">{{ designation || 'None' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Permissions:</span>
+            <span class="value">{{ permissions || 'Standard' }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Theme Section -->
+      <section class="settings-card theme-settings" *ngIf="activeTab === 'appearance'">
+        <div class="card-header">
+          <mat-icon>palette</mat-icon>
+          <h2>Appearance</h2>
+        </div>
+        <div class="card-content">
+          <div class="theme-toggle-row">
+            <div class="theme-info">
+              <h3>Theme Mode</h3>
+              <p>Switch between light and dark modes.</p>
+            </div>
+            <button mat-flat-button color="primary" (click)="toggleTheme()" class="theme-btn">
+              <mat-icon>{{ isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+              {{ isDarkMode() ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- User Management Section (Project Manager Only) -->
+      <section class="settings-card admin-section" *ngIf="isProjectManager && activeTab === 'admin'">
+        <div class="card-header">
+          <mat-icon>manage_accounts</mat-icon>
+          <h2>User Management (Admin)</h2>
+        </div>
+        
+        <div class="admin-tabs">
+          <button [class.active]="adminSubTab === 'add'" (click)="adminSubTab = 'add'">Add User</button>
+          <button [class.active]="adminSubTab === 'update'" (click)="adminSubTab = 'update'">Update User</button>
+          <button [class.active]="adminSubTab === 'remove'" (click)="adminSubTab = 'remove'">Remove User</button>
+        </div>
+
+        <div class="card-content">
+          <!-- Add User Tab -->
+          <div *ngIf="adminSubTab === 'add'">
+            <p class="section-desc">Provision new accounts. The default password will be <strong>password123</strong>.</p>
+            
+            <form (ngSubmit)="addUser()" #userForm="ngForm" class="add-user-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Employee ID *</label>
+                  <input type="text" [(ngModel)]="newUser.employee_id" name="empId" required placeholder="e.g. EMP-006">
+                </div>
+                <div class="form-group">
+                  <label>Full Name *</label>
+                  <input type="text" [(ngModel)]="newUser.employee_name" name="empName" required placeholder="e.g. John Doe">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Email *</label>
+                  <input type="email" [(ngModel)]="newUser.email" name="email" required placeholder="john.doe@example.com">
+                </div>
+                <div class="form-group">
+                  <label>Designation</label>
+                  <input type="text" [(ngModel)]="newUser.designation" name="designation" placeholder="e.g. Engineer">
+                </div>
+              </div>
+
+              <div class="form-group full-width">
+                <label>Permissions / Access Level</label>
+                <input type="text" [(ngModel)]="newUser.permissions" name="permissions" placeholder="e.g. View, Edit, Admin">
+              </div>
+
+              <div class="alert success" *ngIf="successMessage">
+                <mat-icon>check_circle</mat-icon> {{ successMessage }}
+              </div>
+              <div class="alert error" *ngIf="errorMessage">
+                <mat-icon>error</mat-icon> {{ errorMessage }}
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" [disabled]="userForm.invalid" mat-flat-button color="primary">Create User</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Update User Tab -->
+          <div *ngIf="adminSubTab === 'update'">
+            <p class="section-desc">Select a user to update their details.</p>
+            
+            <div class="user-list-grid">
+              <div class="user-list-item" *ngFor="let user of allUsers" [class.selected]="selectedUserToUpdate?.employee_id === user.employee_id" (click)="selectUserForUpdate(user)">
+                <div class="user-info">
+                  <strong>{{ user.employee_name }}</strong> ({{ user.employee_id }})
+                  <div class="user-email">{{ user.email }}</div>
+                </div>
+                <mat-icon *ngIf="selectedUserToUpdate?.employee_id === user.employee_id">check_circle</mat-icon>
+              </div>
+            </div>
+
+            <form *ngIf="selectedUserToUpdate" (ngSubmit)="updateUser()" class="add-user-form" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color, #e2e8f0);">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Full Name</label>
+                  <input type="text" [(ngModel)]="updatePayload.employee_name" name="updName">
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <input type="email" [(ngModel)]="updatePayload.email" name="updEmail">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Designation</label>
+                  <input type="text" [(ngModel)]="updatePayload.designation" name="updDesignation">
+                </div>
+                <div class="form-group">
+                  <label>Permissions / Access Level</label>
+                  <input type="text" [(ngModel)]="updatePayload.permissions" name="updPermissions">
+                </div>
+              </div>
+
+              <div class="alert success" *ngIf="successMessage">
+                <mat-icon>check_circle</mat-icon> {{ successMessage }}
+              </div>
+              <div class="alert error" *ngIf="errorMessage">
+                <mat-icon>error</mat-icon> {{ errorMessage }}
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" mat-flat-button color="primary">Update User</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Remove User Tab -->
+          <div *ngIf="adminSubTab === 'remove'">
+            <p class="section-desc">Select a user to permanently remove from the system.</p>
+            
+            <div class="user-list-grid">
+              <div class="user-list-item danger-hover" *ngFor="let user of allUsers" [class.selected-danger]="selectedUserToDelete?.employee_id === user.employee_id" (click)="selectUserForDelete(user)">
+                <div class="user-info">
+                  <strong>{{ user.employee_name }}</strong> ({{ user.employee_id }})
+                  <div class="user-email">{{ user.email }}</div>
+                </div>
+                <mat-icon color="warn" *ngIf="selectedUserToDelete?.employee_id === user.employee_id">delete</mat-icon>
+              </div>
+            </div>
+
+            <div *ngIf="selectedUserToDelete" style="margin-top: 1.5rem; padding: 1.5rem; border-radius: 8px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2);">
+              <h3 style="color: #ef4444; margin-top: 0;">Confirm Deletion</h3>
+              <p>Are you sure you want to delete <strong>{{ selectedUserToDelete.employee_name }}</strong>? This action cannot be undone.</p>
+              
+              <div class="alert success" *ngIf="successMessage">
+                <mat-icon>check_circle</mat-icon> {{ successMessage }}
+              </div>
+              <div class="alert error" *ngIf="errorMessage">
+                <mat-icon>error</mat-icon> {{ errorMessage }}
+              </div>
+
+              <div class="form-actions">
+                <button (click)="deleteUser()" mat-flat-button style="background: #ef4444; color: white; border: none; padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                  Permanently Delete User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Logout Section -->
+      <section class="settings-card logout-section" *ngIf="activeTab === 'logout'">
+        <div class="card-header">
+          <mat-icon style="color: #ef4444;">logout</mat-icon>
+          <h2>Logout</h2>
+        </div>
+        <div class="card-content">
+          <p class="section-desc">Are you sure you want to log out of the Maritime Project Planning tool?</p>
+          <div class="form-actions" style="margin-top: 1.5rem;">
+            <button mat-flat-button (click)="logout()" style="background-color: #ef4444; color: white; border: none; padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              Confirm Logout
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

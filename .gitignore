@@ -1,0 +1,61 @@
+# Python Virtual Environments
+backend-app/venv/
+backend-app/.venv/
+venv/
+.venv/
+
+# Python Bytecode and Caching
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+.cache/
+
+# Local Environment configuration files (Secrets)
+backend-app/.env
+.env
+
+# Angular build outputs
+frontend-app/dist/
+frontend-app/tmp/
+frontend-app/out-tsc/
+frontend-app/bazel-out/
+dist/
+
+# Node modules
+frontend-app/node_modules/
+node_modules/
+
+# Angular dev cache
+frontend-app/.angular/
+.angular/
+
+# IDEs and editors
+.idea/
+.vscode/
+frontend-app/.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# User Uploads and local generated survey reports
+backend-app/api/uploads/*
+# Keep the directory structure but ignore contents
+!backend-app/api/uploads/.gitkeep
+
+
+#api docs
+fastapi_docs/
+
+# Intermediate survey documents
+Intermediate_survey/

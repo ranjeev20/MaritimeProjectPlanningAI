@@ -1,0 +1,80 @@
+<div class="login-container">
+  <div class="ocean-background">
+    <div class="wave wave1"></div>
+    <div class="wave wave2"></div>
+    <div class="wave wave3"></div>
+  </div>
+
+  <div class="login-card">
+    <div class="logo-container">
+      <div class="compass-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </div>
+      <h2>Maritime Plan</h2>
+      <p class="subtitle">Navigate your projects with precision</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" #loginForm="ngForm" class="login-form">
+      <div class="input-group">
+        <label for="email">Email</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            [(ngModel)]="email" 
+            required 
+            placeholder="admin@maritime.com"
+            autocomplete="email"
+          >
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="password">Password</label>
+        <div class="input-wrapper">
+          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            [(ngModel)]="password" 
+            required 
+            placeholder="••••••••"
+            autocomplete="current-password"
+          >
+        </div>
+      </div>
+
+      <div class="error-message" *ngIf="errorMessage">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" class="submit-btn" [disabled]="isLoading || loginForm.invalid">
+        <span *ngIf="!isLoading">Log In</span>
+        <div class="spinner" *ngIf="isLoading"></div>
+      </button>
+      
+      <div class="credentials-hint">
+        <p>Demo Credentials:</p>
+        <p><strong>Email:</strong> johannesvandenberg@gmail.com</p>
+        <p><strong>Password:</strong> password123</p>
+      </div>
+    </form>
+  </div>
+</div>

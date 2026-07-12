@@ -1,0 +1,88 @@
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$blue-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+:root {
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --sidebar-bg: #e2e8f0;
+  --text-color: #0f172a;
+  --input-bg: #ffffff;
+  --border-color: #cbd5e1;
+  --primary-brand: #2563eb;
+  --chip-bg: #f1f5f9;
+  --icon-color: #64748b;
+  --hover-bg: #cbd5e1;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  
+  // Transition variables
+  --theme-transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+
+body.dark-mode {
+  --bg-color: #08101a; // Deep Marine Blue
+  --card-bg: #0d1b2a; // Slate Grey / Deep Blue
+  --sidebar-bg: #0d1b2a; // Slate Grey / Deep Blue
+  --text-color: #f8fafc;
+  --input-bg: #142438;
+  --border-color: #1e3a5f;
+  --primary-brand: #ff6b35; // Emergency Orange
+  --chip-bg: #1e293b;
+  --icon-color: #94a3b8;
+  --hover-bg: #1e3a5f;
+  --glass-bg: rgba(20, 36, 56, 0.7);
+  --glass-border: rgba(30, 58, 95, 0.5);
+  
+  // Material 3 overrides for dark mode
+  --mat-sys-surface: var(--bg-color);
+  --mat-sys-on-surface: var(--text-color);
+
+  // Modern Card variables (AI output)
+  --surface-card: rgba(30, 41, 59, 0.85);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --bg-subtle: rgba(15, 23, 42, 0.4);
+  --bg-hover: rgba(30, 41, 59, 0.9);
+  --primary-light: rgba(59, 130, 246, 0.1);
+  --primary-border: rgba(59, 130, 246, 0.2);
+  --success-light: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(16, 185, 129, 0.2);
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Inter', Roboto, "Helvetica Neue", sans-serif;
+  transition: var(--theme-transition);
+  height: 100vh;
+  overflow: hidden;
+}
+
+html, body { height: 100%; }
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color); 
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--icon-color); 
+}

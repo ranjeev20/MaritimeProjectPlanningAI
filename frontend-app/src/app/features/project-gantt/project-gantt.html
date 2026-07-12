@@ -1,0 +1,189 @@
+<div class="gantt-wrapper">
+  <div class="gantt-header">
+    <div class="project-selector">
+      <mat-icon>directions_boat</mat-icon>
+      <select [(ngModel)]="selectedProject" (change)="onProjectChange()">
+        <option *ngFor="let p of projects" [ngValue]="p">{{ p.project_title }} ({{ p.vessel_name }})</option>
+      </select>
+    </div>
+
+    <div class="view-controls">
+      <button class="icon-btn" (click)="zoomOut()" title="Zoom Out"><mat-icon>remove_circle_outline</mat-icon></button>
+      <button class="icon-btn" (click)="zoomIn()" title="Zoom In"><mat-icon>add_circle_outline</mat-icon></button>
+      <div class="divider"></div>
+      <button class="view-btn" [class.active]="showMetrics" (click)="toggleMetrics()"
+        title="Toggle Crew Allocation & Financial Columns">
+        <mat-icon
+          style="font-size: 18px; width: 18px; height: 18px; margin-right: 4px; vertical-align: middle;">monetization_on</mat-icon>
+        {{ showMetrics ? 'Hide Crew & Financials' : 'Show Crew & Financials' }}
+      </button>
+      <div class="divider"></div>
+      <button class="view-btn" [class.active]="currentViewMode === 'Week'"
+        (click)="changeViewMode('Week')">Week</button>
+      <button class="view-btn" [class.active]="currentViewMode === 'Month'"
+        (click)="changeViewMode('Month')">Month</button>
+      <button class="view-btn" [class.active]="currentViewMode === 'Quarter'"
+        (click)="changeViewMode('Quarter')">Quarter</button>
+      <button class="view-btn" [class.active]="currentViewMode === 'Year'"
+        (click)="changeViewMode('Year')">Year</button>
+    </div>
+  </div>
+
+  <div class="gantt-chart-container">
+    <div #ganttContainer class="gantt-here"></div>
+  </div>
+</div>
+
+<!-- Custom Task Edit Modal -->
+<div class="custom-modal-backdrop" *ngIf="isModalOpen" (click)="closeModal()">
+  <div class="custom-modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Edit Task / Subtask</h3>
+      <button class="close-btn" (click)="closeModal()">&times;</button>
+    </div>
+
+    <div class="modal-body" *ngIf="editingTask">
+      <!-- Validation Errors Alert Box -->
+      <div class="gantt-validation-errors" *ngIf="activeErrors && activeErrors.length > 0">
+        <div class="error-header">
+          <mat-icon>warning</mat-icon>
+          <span>Validation Violations ({{ activeErrors.length }})</span>
+        </div>
+        <ul class="error-list">
+          <li *ngFor="let err of activeErrors">{{ err }}</li>
+        </ul>
+      </div>
+
+      <div class="form-group">
+        <label>Task Name</label>
+        <input type="text" [(ngModel)]="editingTask.text" placeholder="Enter task name" />
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select [(ngModel)]="editingTask.status" (change)="onStatusChange()">
+          <option value="To Do">⚪ To Do</option>
+          <option value="Not Started">⚪ Not Started</option>
+          <option value="In Progress">🔵 In Progress</option>
+          <option value="Completed">🟢 Completed</option>
+          <option value="Delayed">🔴 Delayed</option>
+        </select>
+      </div>
+
+      <div class="form-group" *ngIf="editingTask.type !== 'project' && editingTask.type !== 'milestone'">
+        <label>Progress (%)</label>
+        <input type="number" [(ngModel)]="editingTask.progressPercent" min="0" max="100" [disabled]="editingTask.hasChildren" />
+        <span *ngIf="editingTask.hasChildren" style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+          Calculated from subtasks average
+        </span>
+      </div>
+
+      <div class="form-group" *ngIf="editingTask.type === 'project'">
+        <label>Progress (%)</label>
+        <input type="number" [ngModel]="editingTask.progressPercent" min="0" max="100" disabled />
+        <span style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+          Calculated from tasks average
+        </span>
+      </div>
+
+      <!-- Tab headers -->
+      <div class="tab-headers">
+        <button class="tab-btn" [class.active]="editMode === 'actual'" (click)="setEditMode('actual')">Actual</button>
+        <button class="tab-btn" [class.active]="editMode === 'planned'"
+          (click)="setEditMode('planned')">Planned</button>
+      </div>
+
+      <!-- Actual Fields Tab -->
+      <div class="tab-content" *ngIf="editMode === 'actual'">
+        <div class="form-group">
+          <label>Start Date (DD-MM-YYYY)</label>
+          <input type="text" [(ngModel)]="editingTask.Actual_start_date" placeholder="DD-MM-YYYY"
+            (change)="onActualDateOrDurationChange()" [disabled]="editingTask.type === 'project' || editingTask.hasChildren" />
+        </div>
+        <div class="form-group">
+          <label>End Date (DD-MM-YYYY)</label>
+          <input type="text" [(ngModel)]="editingTask.Actual_end_date" placeholder="DD-MM-YYYY"
+            (change)="onActualDateChange()" [disabled]="editingTask.type === 'project' || editingTask.hasChildren" />
+        </div>
+        <div class="form-group">
+          <label>Duration (days)</label>
+          <input type="number" [(ngModel)]="editingTask.Actual_duration" min="1"
+            (change)="onActualDateOrDurationChange()" [disabled]="editingTask.type === 'project' || editingTask.hasChildren" />
+        </div>
+
+        <!-- Only show crew if it's NOT a project, milestone, or task with subtasks -->
+        <ng-container
+          *ngIf="editingTask.type !== 'project' && editingTask.type !== 'milestone' && !editingTask.hasChildren">
+          <div class="form-group">
+            <label>Crew</label>
+            <input type="number" [(ngModel)]="editingTask.Actual_crew" min="1" (change)="onActualCrewChange()" />
+          </div>
+        </ng-container>
+      </div>
+
+      <!-- Planned Fields Tab -->
+      <div class="tab-content" *ngIf="editMode === 'planned'">
+        <div class="form-group">
+          <label>P_Start (DD-MM-YYYY)</label>
+          <input type="text" [(ngModel)]="editingTask.planned_start_date" placeholder="DD-MM-YYYY"
+            (change)="onPlannedDateOrDurationChange()" [disabled]="editingTask.type === 'project' || editingTask.hasChildren" />
+        </div>
+        <div class="form-group">
+          <label>P_End (DD-MM-YYYY)</label>
+          <input type="text" [(ngModel)]="editingTask.planned_end_date" placeholder="DD-MM-YYYY"
+            (change)="onPlannedDateChange()" [disabled]="editingTask.type === 'project' || editingTask.hasChildren" />
+        </div>
+        <div class="form-group">
+          <label>P_Duration (days)</label>
+          <input type="number" [(ngModel)]="editingTask.Planned_duration" min="1"
+            (change)="onPlannedDateOrDurationChange()" [disabled]="editingTask.type === 'project' || editingTask.hasChildren" />
+        </div>
+
+        <!-- Only show Planned crew if it's NOT a project, milestone, or task with subtasks -->
+        <ng-container
+          *ngIf="editingTask.type !== 'project' && editingTask.type !== 'milestone' && !editingTask.hasChildren">
+          <div class="form-group">
+            <label>P_Crew</label>
+            <input type="number" [(ngModel)]="editingTask.Planned_crew" min="1" (change)="onPlannedCrewChange()" />
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="delete-btn" (click)="deleteTask()" *ngIf="editingTask && editingTask.type !== 'project'">Delete</button>
+      <button class="cancel-btn" (click)="closeModal()">Cancel</button>
+      <button class="save-btn" (click)="saveTask()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Validation Errors Modal (Pop-in) -->
+<div class="custom-modal-backdrop" *ngIf="isValidationErrorModalOpen" (click)="closeValidationErrorModal()" style="z-index: 10002;">
+  <div class="custom-modal-content validation-error-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="error-title-wrapper">
+        <mat-icon>error_outline</mat-icon>
+        <h3>Validation Constraint Error</h3>
+      </div>
+      <button class="close-btn" (click)="closeValidationErrorModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="error-intro">
+        The action could not be completed because it violates project planning rules:
+      </p>
+      <div class="error-list-container">
+        <ul class="error-list">
+          <li *ngFor="let err of validationErrors">{{ err }}</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="save-btn" (click)="closeValidationErrorModal()">
+        Dismiss
+      </button>
+    </div>
+  </div>
+</div>

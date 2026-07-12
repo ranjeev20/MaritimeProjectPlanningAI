@@ -1,0 +1,56 @@
+
+  python -m venv venv            - to create a virtual environment
+  .\venv\Scripts\activate        - to activate the virtual environment
+  deactivate                     - to deactivate the virtual environment
+
+
+-------------------------------------------------------------------------------------------------------------------------     
+
+  What pip actually is
+It’s Python’s package manager
+Used to install, update, and remove libraries from the Python Package Index (PyPI)
+
+
+---------------------------------------------------------------------------------------------------------------------     
+uvicorn main:app --reload
+ 
+uvicorn
+A fast ASGI server (Asynchronous Server Gateway Interface)
+It runs modern Python web apps that support async code
+
+
+main:app
+This tells Uvicorn what to run:
+
+main → the Python file (main.py)
+app → the application instance inside that file
+
+So in main.py, you likely have something like:
+
+from fastapi import FastAPI
+app = FastAPI()
+
+🔹 --reload
+Enables auto-reloading The server restarts automatically whenever you change your code Very useful during development
+
+-------------------------------------------------------------------------------------------------------------------------     
+frontend port:  http://localhost:4200/
+
+backend port: http://localhost:8000
+
+
+--------------------------------------------------------------------------------------------------------------------------  
+backend-app
+
+  - backend port: http://localhost:8000
+  - create virtual environment: python -m venv venv
+  - activate virtual environment: .\venv\Scripts\activate
+  - run the server: uvicorn main:app --reload
+
+
+frontend-app
+
+  - frontend port:  http://localhost:4200/
+  - run the server: npm start
+
+--------------------------------------------------------------------------------------------------------------------------  

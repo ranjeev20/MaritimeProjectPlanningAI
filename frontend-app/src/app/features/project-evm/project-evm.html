@@ -1,0 +1,327 @@
+<div class="dashboard-wrapper">
+  <!-- Header with Project Selector -->
+  <div class="dashboard-header">
+    <div class="header-left">
+      <mat-icon class="header-icon">dashboard</mat-icon>
+      <h2>EVM Project Health Dashboard</h2>
+    </div>
+    <div class="project-selector">
+      <mat-icon>assessment</mat-icon>
+      <select [(ngModel)]="selectedProject" (change)="onProjectChange()">
+        <option *ngFor="let p of projects" [ngValue]="p">{{ p.project_title }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="ai-loading-container" *ngIf="isLoading">
+    <div class="glow-sphere"></div>
+    <div class="loading-content">
+      <mat-icon class="ai-loading-icon">bubble_chart</mat-icon>
+      <h3 class="loading-title">Calculating EVM & Project Health Forecasts</h3>
+      <p class="loading-subtitle">
+        Running deterministic cost and schedule calculations, running critical path analysis, and invoking LangGraph AI agents to evaluate recovery options...
+      </p>
+      <div class="loading-steps">
+        <div class="step-item">
+          <span class="bullet active"></span>
+          <span>Computing BAC, EAC, CPI, and SPI metrics...</span>
+        </div>
+        <div class="step-item">
+          <span class="bullet active"></span>
+          <span>Analyzing task schedules and active constraints...</span>
+        </div>
+        <div class="step-item">
+          <span class="bullet active"></span>
+          <span>Engaging Gemini LangGraph Agent for recovery advice...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Content -->
+  <div class="dashboard-content" *ngIf="!isLoading && metrics">
+    
+    <!-- Row 1: Health Status Badges -->
+    <div class="health-badges-row">
+      <div class="health-badge-card">
+        <span class="badge-label">Budget Status</span>
+        <span class="status-badge" [class.on-budget]="aiAnalysis?.budget?.status === 'On Budget'"
+                                  [class.slightly-over]="aiAnalysis?.budget?.status === 'Slightly Over Budget'"
+                                  [class.over-budget]="aiAnalysis?.budget?.status === 'Over Budget'">
+          <mat-icon>{{ aiAnalysis?.budget?.status === 'On Budget' ? 'check_circle' : 'warning' }}</mat-icon>
+          {{ aiAnalysis?.budget?.status }}
+        </span>
+      </div>
+
+      <div class="health-badge-card">
+        <span class="badge-label">Schedule Status</span>
+        <span class="status-badge" [class.on-schedule]="aiAnalysis?.schedule?.status === 'On Schedule'"
+                                  [class.at-risk]="aiAnalysis?.schedule?.status === 'At Risk'"
+                                  [class.delayed]="aiAnalysis?.schedule?.status === 'Delayed'">
+          <mat-icon>{{ aiAnalysis?.schedule?.status === 'On Schedule' ? 'schedule' : 'hourglass_empty' }}</mat-icon>
+          {{ aiAnalysis?.schedule?.status }}
+        </span>
+      </div>
+
+      <div class="health-badge-card">
+        <span class="badge-label">Overall Risk Level</span>
+        <span class="status-badge" [class.risk-low]="aiAnalysis?.budget?.risk === 'Low'"
+                                  [class.risk-medium]="aiAnalysis?.budget?.risk === 'Medium'"
+                                  [class.risk-high]="aiAnalysis?.budget?.risk === 'High'">
+          <mat-icon>error_outline</mat-icon>
+          {{ aiAnalysis?.budget?.risk }} Risk
+        </span>
+      </div>
+
+      <div class="health-badge-card">
+        <span class="badge-label">AI Confidence</span>
+        <span class="confidence-badge">
+          <mat-icon>stars</mat-icon>
+          {{ (aiAnalysis?.forecast?.confidence * 100) | number:'1.0-0' }}%
+        </span>
+      </div>
+    </div>
+
+    <!-- Row 2: Forecast Summary Cards -->
+    <div class="summary-cards-grid">
+      <div class="summary-card">
+        <div class="card-icon blue"><mat-icon>account_balance_wallet</mat-icon></div>
+        <div class="card-info">
+          <h4>Budget at Completion (BAC)</h4>
+          <span class="card-value">{{ getCurrencySymbol() }}{{ metrics.bac | number:'1.0-0' }}</span>
+          <p class="card-sub">Baseline budget</p>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon purple"><mat-icon>trending_up</mat-icon></div>
+        <div class="card-info">
+          <h4>Forecast Cost (EAC)</h4>
+          <span class="card-value">{{ getCurrencySymbol() }}{{ metrics.predictedCompletionCost | number:'1.0-0' }}</span>
+          <p class="card-sub">Estimated final cost</p>
+        </div>
+      </div>
+
+      <div class="summary-card" [class.card-alert]="metrics.vac < 0">
+        <div class="card-icon" [class.red]="metrics.vac < 0" [class.green]="metrics.vac >= 0">
+          <mat-icon>{{ metrics.vac >= 0 ? 'check' : 'trending_down' }}</mat-icon>
+        </div>
+        <div class="card-info">
+          <h4>Budget Variance (VAC)</h4>
+          <span class="card-value" [class.text-danger]="metrics.vac < 0">
+            {{ metrics.vac >= 0 ? '+' : '' }}{{ getCurrencySymbol() }}{{ metrics.vac | number:'1.0-0' }}
+          </span>
+          <p class="card-sub">{{ metrics.vac >= 0 ? 'Under Budget' : 'Overrun' }}</p>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon orange"><mat-icon>calendar_today</mat-icon></div>
+        <div class="card-info">
+          <h4>Forecast Completion</h4>
+          <span class="card-value date-value">{{ metrics.predictedCompletionDate | date:'dd-MM-yyyy' }}</span>
+          <p class="card-sub" [class.text-danger]="metrics.forecastDelayDays > 0">
+            {{ metrics.forecastDelayDays > 0 ? '+' + metrics.forecastDelayDays + ' Days Delay' : 'On Schedule' }}
+          </p>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon teal"><mat-icon>people</mat-icon></div>
+        <div class="card-info">
+          <h4>Crew Allocations</h4>
+          <div class="crew-detail">
+            <div>
+              <span class="crew-val">{{ metrics.currentCrewUtilization }}%</span>
+              <p class="card-sub">Utilized</p>
+            </div>
+            <div class="crew-divider"></div>
+            <div>
+              <span class="crew-val">{{ aiAnalysis?.resources?.recommendedCrew }}</span>
+              <p class="card-sub">Rec. Size</p>
+            </div>
+          </div>
+          <p class="card-sub text-warning" style="margin-top: 4px;" *ngIf="aiAnalysis?.resources?.additionalCrewNeeded > 0">
+            Onboard +{{ aiAnalysis?.resources?.additionalCrewNeeded }} crew needed
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Task Counters Row -->
+    <div class="task-counters-row">
+      <div class="counter-box danger">
+        <span class="count-num">{{ metrics.criticalPathCount }}</span>
+        <span class="count-label">Critical Path Tasks</span>
+      </div>
+      <div class="counter-box warning">
+        <span class="count-num">{{ metrics.delayedTasksCount }}</span>
+        <span class="count-label">Delayed Tasks</span>
+      </div>
+      <div class="counter-box info">
+        <span class="count-num">{{ metrics.tasksNotStartedCount }}</span>
+        <span class="count-label">Not Started Tasks</span>
+      </div>
+      <div class="counter-box blocked" [class.active]="metrics.blockedTasksCount > 0">
+        <span class="count-num">{{ metrics.blockedTasksCount }}</span>
+        <span class="count-label">Blocked Tasks</span>
+      </div>
+    </div>
+
+    <!-- Row 4: Grid with Chart and AI Recommendations -->
+    <div class="dashboard-grid">
+      <!-- Left side: Timeseries Chart & EVM Formulas (System Generated) -->
+      <div class="grid-left">
+        <div class="chart-card">
+          <div class="card-header">
+            <div class="header-titles">
+              <h3>EVM Cost Projection Chart</h3>
+              <p class="subtitle">Comparing baseline Budgeted Cost (PV), Actual Cost (AC), and AI Forecast (EAC) trends.</p>
+            </div>
+            <div class="view-controls">
+              <button class="view-btn" [class.active]="currentViewMode === 'Weekly'" (click)="changeViewMode('Weekly')">Weekly</button>
+              <button class="view-btn" [class.active]="currentViewMode === 'Monthly'" (click)="changeViewMode('Monthly')">Monthly</button>
+              <button class="view-btn" [class.active]="currentViewMode === 'Yearly'" (click)="changeViewMode('Yearly')">Yearly</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas #evmChart></canvas>
+          </div>
+        </div>
+
+        <!-- Deterministic Core EVM Formulas Card -->
+        <div class="formulas-card">
+          <div class="card-section-title">
+            <mat-icon>settings_applications</mat-icon>
+            <h4>Calculated Project Metrics (System Generated)</h4>
+          </div>
+          <div class="formulas-grid">
+            <div class="formula-item">
+              <span class="f-label">CPI (Cost Performance)</span>
+              <span class="f-val" [class.good]="metrics.cpi >= 1" [class.bad]="metrics.cpi < 1">{{ metrics.cpi }}</span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">SPI (Schedule Performance)</span>
+              <span class="f-val" [class.good]="metrics.spi >= 1" [class.bad]="metrics.spi < 1">{{ metrics.spi }}</span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">CV (Cost Variance)</span>
+              <span class="f-val" [class.good]="metrics.cv >= 0" [class.bad]="metrics.cv < 0">
+                {{ getCurrencySymbol() }}{{ metrics.cv | number:'1.0-0' }}
+              </span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">SV (Schedule Variance)</span>
+              <span class="f-val" [class.good]="metrics.sv >= 0" [class.bad]="metrics.sv < 0">
+                {{ getCurrencySymbol() }}{{ metrics.sv | number:'1.0-0' }}
+              </span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">ETC (Estimate to Complete)</span>
+              <span class="f-val">{{ getCurrencySymbol() }}{{ metrics.etc | number:'1.0-0' }}</span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">Remaining Duration</span>
+              <span class="f-val">{{ metrics.remainingDurationDays }} Days</span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">Remaining Work Hours</span>
+              <span class="f-val">{{ metrics.remainingWorkHours | number:'1.0-1' }} Hours</span>
+            </div>
+            <div class="formula-item">
+              <span class="f-label">Remaining Budget</span>
+              <span class="f-val">{{ getCurrencySymbol() }}{{ metrics.remainingBudget | number:'1.0-0' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right side: AI Insights & Actionable Recovery Recommendations -->
+      <div class="grid-right">
+        <div class="ai-insights-card">
+          <div class="ai-header">
+            <mat-icon class="ai-stars">bubble_chart</mat-icon>
+            <div>
+              <h3>AI Project Health Insights</h3>
+              <p class="subtitle">Real-time schedule recovery & risk mitigation strategies</p>
+            </div>
+          </div>
+
+          <div class="ai-body">
+            
+            <!-- Category 1: Resource Optimization -->
+            <div class="rec-section purple-accent">
+              <div class="section-title">
+                <mat-icon>people_outline</mat-icon>
+                <h5>Resource Optimization</h5>
+              </div>
+              <ul class="rec-list">
+                <li *ngFor="let item of aiAnalysis?.recommendations?.resourceOptimization">
+                  <mat-icon class="bullet-icon">arrow_right_alt</mat-icon>
+                  <span>{{ item }}</span>
+                </li>
+                <li *ngIf="!aiAnalysis?.recommendations?.resourceOptimization?.length" class="empty-msg">
+                  No resource recommendations.
+                </li>
+              </ul>
+            </div>
+
+            <!-- Category 2: Schedule Recovery -->
+            <div class="rec-section orange-accent">
+              <div class="section-title">
+                <mat-icon>restore</mat-icon>
+                <h5>Schedule Recovery</h5>
+              </div>
+              <ul class="rec-list">
+                <li *ngFor="let item of aiAnalysis?.recommendations?.scheduleRecovery">
+                  <mat-icon class="bullet-icon">arrow_right_alt</mat-icon>
+                  <span>{{ item }}</span>
+                </li>
+                <li *ngIf="!aiAnalysis?.recommendations?.scheduleRecovery?.length" class="empty-msg">
+                  No schedule recovery actions needed.
+                </li>
+              </ul>
+            </div>
+
+            <!-- Category 3: Budget Optimization -->
+            <div class="rec-section green-accent">
+              <div class="section-title">
+                <mat-icon>attach_money</mat-icon>
+                <h5>Budget Optimization</h5>
+              </div>
+              <ul class="rec-list">
+                <li *ngFor="let item of aiAnalysis?.recommendations?.budgetOptimization">
+                  <mat-icon class="bullet-icon">arrow_right_alt</mat-icon>
+                  <span>{{ item }}</span>
+                </li>
+                <li *ngIf="!aiAnalysis?.recommendations?.budgetOptimization?.length" class="empty-msg">
+                  No budget optimization actions needed.
+                </li>
+              </ul>
+            </div>
+
+            <!-- Category 4: Risk Mitigation -->
+            <div class="rec-section red-accent">
+              <div class="section-title">
+                <mat-icon>security</mat-icon>
+                <h5>Risk Mitigation</h5>
+              </div>
+              <ul class="rec-list">
+                <li *ngFor="let item of aiAnalysis?.recommendations?.riskMitigation">
+                  <mat-icon class="bullet-icon">warning</mat-icon>
+                  <span>{{ item }}</span>
+                </li>
+                <li *ngIf="!aiAnalysis?.recommendations?.riskMitigation?.length" class="empty-msg">
+                  No critical risks identified.
+                </li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
