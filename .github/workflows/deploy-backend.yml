@@ -1,0 +1,43 @@
+name: Deploy Backend App to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend-app/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'backend-app/requirements.txt'
+
+      - name: Install Dependencies
+        run: |
+          cd backend-app
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Zip Artifacts for Deployment
+        # Zip the contents of the backend-app folder so main.py is at the root of the archive
+        run: |
+          cd backend-app
+          zip -r ../release.zip ./*
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_APP_SERVICE_PUBLISH_PROFILE }}
+          package: ./release.zip
