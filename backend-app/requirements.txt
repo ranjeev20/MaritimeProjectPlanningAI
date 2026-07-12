@@ -12,3 +12,8 @@ python-dotenv
 loguru
 alembic
 azure-storage-blob
+langchain-google-genai
+PyPDF2
+python-docx
+python-pptx
+openpyxl

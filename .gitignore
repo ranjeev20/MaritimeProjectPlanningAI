@@ -59,3 +59,6 @@ fastapi_docs/
 
 # Intermediate survey documents
 Intermediate_survey/
+
+#deployment
+/deploy_backend_guide.md
