@@ -35,9 +35,47 @@ jobs:
           cd backend-app
           zip -r ../release.zip ./*
 
+      - name: Restart App Service before deploy
+        env:
+          AZURE_PUBLISH_PROFILE: ${{ secrets.AZURE_APP_SERVICE_PUBLISH_PROFILE || secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          python - <<'PY'
+          import base64
+          import os
+          import urllib.request
+          import xml.etree.ElementTree as ET
+
+          profile_xml = os.environ["AZURE_PUBLISH_PROFILE"]
+          root = ET.fromstring(profile_xml)
+          profiles = root.findall(".//publishProfile")
+          publish_profile = None
+          for profile in profiles:
+              if profile.attrib.get("publishMethod") in {"ZipDeploy", "MSDeploy"}:
+                  publish_profile = profile
+                  break
+
+          if publish_profile is None:
+              raise RuntimeError("No compatible publish profile found for restart call.")
+
+          publish_url = publish_profile.attrib["publishUrl"].split(":")[0]
+          username = publish_profile.attrib["userName"]
+          password = publish_profile.attrib["userPWD"]
+          restart_url = f"https://{publish_url}/api/app/restart"
+
+          request = urllib.request.Request(restart_url, method="POST")
+          credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+          request.add_header("Authorization", f"Basic {credentials}")
+          request.add_header("Content-Type", "application/json")
+
+          with urllib.request.urlopen(request, timeout=60) as response:
+              if response.status not in (200, 202):
+                  raise RuntimeError(f"Unexpected restart response status: {response.status}")
+              print(f"App Service restart requested successfully (status: {response.status}).")
+          PY
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_APP_SERVICE_PUBLISH_PROFILE }}
+          publish-profile: ${{ secrets.AZURE_APP_SERVICE_PUBLISH_PROFILE || secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./release.zip
