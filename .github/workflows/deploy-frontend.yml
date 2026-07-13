@@ -45,7 +45,7 @@ jobs:
         run: |
           if [ -n "${{ secrets.PRODUCTION_BACKEND_URL }}" ]; then
             echo "Setting backend URL to ${{ secrets.PRODUCTION_BACKEND_URL }}"
-            sed -i 's|http://localhost:8000|${{ secrets.PRODUCTION_BACKEND_URL }}|g' frontend-app/src/app/core/services/ai.service.ts
+            find frontend-app/src -type f -name "*.ts" -exec sed -i 's|http://localhost:8000|${{ secrets.PRODUCTION_BACKEND_URL }}|g' {} +
           fi
 
       - name: Build Angular App
