@@ -5,6 +5,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-settings',
@@ -86,7 +87,7 @@ export class SettingsComponent implements OnInit {
       return;
     }
     
-    this.http.post('http://localhost:8000/api/users/?requester_id=' + this.employee_id, this.newUser).subscribe({
+    this.http.post(`${environment.apiUrl}/api/users/?requester_id=` + this.employee_id, this.newUser).subscribe({
       next: () => {
         this.successMessage = 'User successfully created!';
         this.newUser = {
@@ -106,7 +107,7 @@ export class SettingsComponent implements OnInit {
   }
 
   loadUsers() {
-    this.http.get<any[]>('http://localhost:8000/api/users/?requester_id=' + this.employee_id).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/api/users/?requester_id=` + this.employee_id).subscribe({
       next: (data) => {
         this.allUsers = data;
       },
@@ -132,7 +133,7 @@ export class SettingsComponent implements OnInit {
     
     if (!this.selectedUserToUpdate) return;
     
-    this.http.put(`http://localhost:8000/api/users/${this.selectedUserToUpdate.employee_id}?requester_id=${this.employee_id}`, this.updatePayload).subscribe({
+    this.http.put(`${environment.apiUrl}/api/users/${this.selectedUserToUpdate.employee_id}?requester_id=${this.employee_id}`, this.updatePayload).subscribe({
       next: () => {
         this.successMessage = 'User successfully updated!';
         this.loadUsers();
@@ -155,7 +156,7 @@ export class SettingsComponent implements OnInit {
     
     if (!this.selectedUserToDelete) return;
     
-    this.http.delete(`http://localhost:8000/api/users/${this.selectedUserToDelete.employee_id}?requester_id=${this.employee_id}`).subscribe({
+    this.http.delete(`${environment.apiUrl}/api/users/${this.selectedUserToDelete.employee_id}?requester_id=${this.employee_id}`).subscribe({
       next: () => {
         this.successMessage = 'User successfully deleted!';
         this.selectedUserToDelete = null;

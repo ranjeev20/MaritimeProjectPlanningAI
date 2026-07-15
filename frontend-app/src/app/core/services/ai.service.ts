@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface ProjectInterpretationDTO {
   projectTitle?: string;
@@ -68,8 +69,7 @@ export interface ProjectPlan {
 })
 export class AiService {
   private http = inject(HttpClient);
-  // In a real app this would be in environment.ts
-  private apiUrl = 'http://localhost:8000/api/projects';
+  private apiUrl = `${environment.apiUrl}/api/projects`;
 
   interpretPrompt(prompt: string): Observable<InterpretationResponse> {
     return this.http.post<InterpretationResponse>(`${this.apiUrl}/interpret`, { prompt });
@@ -130,33 +130,33 @@ export class AiService {
 
   // Custom Survey Report Generator API
   getSurveyTemplates(): Observable<any> {
-    return this.http.get<any>(`http://localhost:8000/api/survey-reports/templates`);
+    return this.http.get<any>(`${environment.apiUrl}/api/survey-reports/templates`);
   }
 
   downloadSurveyTemplateUrl(filename: string): string {
-    return `http://localhost:8000/api/survey-reports/templates/${filename}/download`;
+    return `${environment.apiUrl}/api/survey-reports/templates/${filename}/download`;
   }
 
   getSurveyTemplateBlob(filename: string): Observable<Blob> {
-    return this.http.get(`http://localhost:8000/api/survey-reports/templates/${filename}/download`, { responseType: 'blob' });
+    return this.http.get(`${environment.apiUrl}/api/survey-reports/templates/${filename}/download`, { responseType: 'blob' });
   }
 
   generateAiDescription(file: File, promptCaption: string): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('prompt_caption', promptCaption);
-    return this.http.post<any>(`http://localhost:8000/api/survey-reports/generate-ai-description`, formData);
+    return this.http.post<any>(`${environment.apiUrl}/api/survey-reports/generate-ai-description`, formData);
   }
 
   generateSurveyReport(payload: any): Observable<any> {
-    return this.http.post<any>(`http://localhost:8000/api/survey-reports/generate`, payload);
+    return this.http.post<any>(`${environment.apiUrl}/api/survey-reports/generate`, payload);
   }
 
   downloadGeneratedDocxUrl(reportId: string): string {
-    return `http://localhost:8000/api/survey-reports/generated/${reportId}/download-docx`;
+    return `${environment.apiUrl}/api/survey-reports/generated/${reportId}/download-docx`;
   }
 
   downloadGeneratedPdfUrl(reportId: string): string {
-    return `http://localhost:8000/api/survey-reports/generated/${reportId}/download-pdf`;
+    return `${environment.apiUrl}/api/survey-reports/generated/${reportId}/download-pdf`;
   }
 }
