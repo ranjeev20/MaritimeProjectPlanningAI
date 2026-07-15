@@ -14,9 +14,6 @@ class InterpreterState(TypedDict):
     context: str
     parsed_output: Dict[str, Any]
 
-    print("MODEL =", settings.GEMINI_MODEL)
-    print("KEY =", settings.GEMINI_API_KEY)
-
 def create_interpreter_agent():
 
     
