@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from loguru import logger
 import sys
 
@@ -56,7 +57,17 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# CORS Middleware for Angular Frontend
+
+# 1. Custom Middleware to preserve HTTPS scheme behind Azure App Service proxy
+class AzureHTTPSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.headers.get("x-forwarded-proto") == "https":
+            request.scope["scheme"] = "https"
+        return await call_next(request)
+app.add_middleware(AzureHTTPSMiddleware)
+
+
+# 2. CORS Middleware for Angular Frontend (evaluated after AzureHTTPSMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
