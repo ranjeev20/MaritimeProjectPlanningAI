@@ -26,6 +26,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
   projects: any[] = [];
   selectedProject: any = null;
   showMetrics = false;
+  showPredecessors = false;
 
   isModalOpen = false;
   editingTask: any = null;
@@ -33,6 +34,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
   activeErrors: string[] = [];
   isValidationErrorModalOpen = false;
   validationErrors: string[] = [];
+  eligiblePredecessors: any[] = [];
 
   tasks: any = {
     data: [],
@@ -343,6 +345,66 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       this.openEditModal(task);
       return false; // prevent default lightbox
     });
+
+    gantt.attachEvent("onBeforeLinkAdd", (id, link: any) => {
+      try {
+        const sourceTask = gantt.getTask(link.source);
+        const targetTask = gantt.getTask(link.target);
+        if (sourceTask && targetTask) {
+          if (!this.isPredecessorCompleted(sourceTask) && this.isTaskStarted(targetTask)) {
+            const err = `${GANTT_ERRORS.ERR_011.code}: Predecessor Constraint: Cannot link predecessor "${sourceTask.text}" because it is not in Completed status (Current status: ${sourceTask['status'] || 'Not Started'}), while task "${targetTask.text}" has already been started.`;
+            this.showValidationErrorModal([err]);
+            return false;
+          }
+        }
+      } catch (e) {}
+      return true;
+    });
+
+    gantt.attachEvent("onAfterLinkAdd", (id, link) => {
+      this.ngZone.run(() => {
+        gantt.render();
+        this.cdr.detectChanges();
+      });
+    });
+
+    gantt.attachEvent("onAfterLinkDelete", (id, link) => {
+      this.ngZone.run(() => {
+        gantt.render();
+        this.cdr.detectChanges();
+      });
+    });
+
+    gantt.attachEvent("onAfterLinkUpdate", (id, link) => {
+      this.ngZone.run(() => {
+        gantt.render();
+        this.cdr.detectChanges();
+      });
+    });
+
+    gantt.attachEvent("onTaskClick", (id, e) => {
+      if (!e) return true;
+      const target = (e.target || (e as any).srcElement) as HTMLElement;
+      if (target) {
+        // Direct click on 'x' button inside predecessor badge to remove dependency
+        if (target.classList.contains("pred-remove-btn") || target.closest(".pred-remove-btn")) {
+          const btn = target.classList.contains("pred-remove-btn") ? target : target.closest(".pred-remove-btn");
+          const taskId = btn?.getAttribute("data-task-id") || id;
+          const predId = btn?.getAttribute("data-pred-id");
+          this.removePredecessor(taskId, predId || undefined);
+          return false;
+        }
+
+        // Click on '+ Add' or predecessor name badge to open modal to add/update dependency
+        if (target.classList.contains("pred-add-btn") || target.closest(".pred-add-btn") || 
+            target.classList.contains("pred-name") || target.closest(".pred-name")) {
+          const task = gantt.getTask(id);
+          this.openEditModal(task);
+          return false;
+        }
+      }
+      return true;
+    });
   }
 
   dp: any = null;
@@ -463,17 +525,26 @@ export class ProjectGantt implements AfterViewInit, OnInit {
     gantt.render();
   }
 
+  togglePredecessors() {
+    this.showPredecessors = !this.showPredecessors;
+    this.updateGanttColumns();
+    gantt.render();
+  }
+
   updateGanttColumns() {
     const numberEditor = { type: "number", map_to: "Planned_crew", min: 1, max: 100 };
     const actualNumberEditor = { type: "number", map_to: "Actual_crew", min: 1, max: 100 };
 
-    if (this.showMetrics) {
-      gantt.config.grid_width = 1390;
-    } else {
-      gantt.config.grid_width = 750;
+    let gridWidth = 750;
+    if (this.showPredecessors) {
+      gridWidth += 160;
     }
+    if (this.showMetrics) {
+      gridWidth += 640;
+    }
+    gantt.config.grid_width = gridWidth;
 
-    const baseColumns = [
+    const baseColumns: any[] = [
       {
         name: "text",
         label: "Task name",
@@ -484,7 +555,32 @@ export class ProjectGantt implements AfterViewInit, OnInit {
         template: (task: any) => {
           return `<span title="${task.text}">${task.text}</span>`;
         }
-      },
+      }
+    ];
+
+    if (this.showPredecessors) {
+      baseColumns.push({
+        name: "predecessor",
+        label: "Predecessor",
+        align: "center",
+        width: 160,
+        resize: true,
+        template: (task: any) => {
+          if (task.type === "project") return "";
+          const preds = this.getPredecessors(task);
+          if (preds.length === 0) {
+            return `<span class="pred-add-btn" data-task-id="${task.id}" title="Click to add predecessor dependency">+ Add</span>`;
+          }
+          return preds.map(p => `
+            <span class="gantt-pred-badge" title="Dependent on: ${p.text} (Click to edit)">
+              <span class="pred-name" data-task-id="${task.id}">${p.text}</span>
+              <span class="pred-remove-btn" data-task-id="${task.id}" data-pred-id="${p.id}" title="Remove dependency on ${p.text}">&times;</span>
+            </span>
+          `).join(" ");
+        }
+      });
+    }
+    baseColumns.push(
       {
         name: "Actual_start_date",
         label: "Start date",
@@ -580,7 +676,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
           return `<span>${emoji} ${status}</span>`;
         }
       }
-    ];
+    );
 
     if (this.showMetrics) {
       baseColumns.push(
@@ -732,13 +828,52 @@ export class ProjectGantt implements AfterViewInit, OnInit {
   }
 
   validateTask(task: any): string[] {
-    // Disabled for now as per user request to defer error display to future enhancement
-    return [];
-
     const errors: string[] = [];
     if (!task) return errors;
 
+    // Predecessor Dependency Rule (ERR-011):
+    // If any task or subtask has a predecessor, that predecessor must be in 'Completed' status.
+    // Otherwise, this particular task or subtask cannot be started.
+    const predsToCheck: any[] = [];
+    if (this.editingTask && String(this.editingTask.id) === String(task.id)) {
+      if (this.editingTask.selectedPredecessorId) {
+        try {
+          const pt = gantt.getTask(this.editingTask.selectedPredecessorId);
+          if (pt) predsToCheck.push(pt);
+        } catch (e) {}
+      }
+    } else {
+      predsToCheck.push(...this.getPredecessors(task));
+    }
+
+    if (predsToCheck.length > 0 && this.isTaskStarted(task)) {
+      for (const pred of predsToCheck) {
+        if (!this.isPredecessorCompleted(pred)) {
+          errors.push(
+            `${GANTT_ERRORS.ERR_011.code}: Predecessor Constraint: Task "${task.text}" cannot be started because its predecessor "${pred.text}" is not in Completed status (Current predecessor status: ${pred.status || 'Not Started'}).`
+          );
+        }
+      }
+    }
+
     const rootId = gantt.config.root_id;
+
+    // Subtask constraint: If parent task has a predecessor that is not completed, subtask cannot start either
+    if (task.parent && task.parent !== rootId && this.isTaskStarted(task)) {
+      try {
+        const parentTask = gantt.getTask(task.parent);
+        if (parentTask && parentTask.type !== 'project') {
+          const parentPreds = this.getPredecessors(parentTask);
+          for (const pPred of parentPreds) {
+            if (!this.isPredecessorCompleted(pPred)) {
+              errors.push(
+                `${GANTT_ERRORS.ERR_011.code}: Predecessor Constraint: Subtask "${task.text}" cannot be started because parent task "${parentTask.text}" has predecessor "${pPred.text}" that is not in Completed status (Current status: ${pPred.status || 'Not Started'}).`
+              );
+            }
+          }
+        }
+      } catch (e) {}
+    }
 
     // Helper to get task state (handling if the id matches the current edited task)
     const getTaskState = (id: string | number) => {
@@ -747,7 +882,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
         return {
           ...gt,
           ...task,
-          status: task.status || gt['status'] || 'In Progress',
+          status: task.status || gt['status'] || 'To Do',
           progressPercent: task.progressPercent !== undefined ? task.progressPercent : Math.round((gt.progress || 0) * 100),
           planned_start_date: task.planned_start_date || gt['planned_start_date'] || "",
           planned_end_date: task.planned_end_date || gt['planned_end_date'] || "",
@@ -758,7 +893,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       }
       return {
         ...gt,
-        status: gt['status'] || 'In Progress',
+        status: gt['status'] || 'To Do',
         progressPercent: Math.round((gt.progress || 0) * 100),
         planned_start_date: gt['planned_start_date'] || "",
         planned_end_date: gt['planned_end_date'] || "",
@@ -768,32 +903,28 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       };
     };
 
-    // Helpers to dynamically resolve either the currently dragged Date objects or the planned date strings
-    const getPlannedStartDate = (t: any) => {
+    // Helpers to dynamically resolve actual dates for started tasks
+    const getActualStartDate = (t: any): Date | null => {
+      if (!this.isTaskStarted(t)) return null;
       if (this.isModalOpen && this.editingTask && String(t.id) === String(this.editingTask.id)) {
-        return this.parseDate(t.planned_start_date);
+        return this.parseDate(this.editingTask.Actual_start_date || this.editingTask.actual_start_date);
       }
-      if (t.start_date instanceof Date) {
-        return t.start_date;
-      }
-      return this.parseDate(t.planned_start_date);
+      return this.parseDate(t.Actual_start_date || t.actual_start_date);
     };
 
-    const getPlannedEndDate = (t: any) => {
+    const getActualEndDate = (t: any): Date | null => {
+      if (!this.isTaskStarted(t)) return null;
       if (this.isModalOpen && this.editingTask && String(t.id) === String(this.editingTask.id)) {
-        return this.parseDate(t.planned_end_date);
+        return this.parseDate(this.editingTask.Actual_end_date || this.editingTask.actual_end_date);
       }
-      if (t.end_date instanceof Date) {
-        return t.end_date;
-      }
-      return this.parseDate(t.planned_end_date);
+      return this.parseDate(t.Actual_end_date || t.actual_end_date);
     };
 
-    // Rule 1 & 2: Project date validation
+    // Rule 1 & 2: Project date validation (Actual)
     if (task.type === 'project' && (!task.parent || task.parent === rootId)) {
-      if (task.status !== 'Not Started') {
-        const projStart = getPlannedStartDate(task);
-        const projEnd = getPlannedEndDate(task);
+      if (this.isTaskStarted(task)) {
+        const projStart = getActualStartDate(task);
+        const projEnd = getActualEndDate(task);
         if (projStart && projEnd) {
           const childIds = gantt.getChildren(task.id);
           const childStarts: Date[] = [];
@@ -801,9 +932,9 @@ export class ProjectGantt implements AfterViewInit, OnInit {
 
           childIds.forEach(cId => {
             const childState = getTaskState(cId);
-            if (childState.status !== 'Not Started') {
-              const cs = getPlannedStartDate(childState);
-              const ce = getPlannedEndDate(childState);
+            if (this.isTaskStarted(childState)) {
+              const cs = getActualStartDate(childState);
+              const ce = getActualEndDate(childState);
               if (cs) childStarts.push(cs);
               if (ce) childEnds.push(ce);
             }
@@ -825,21 +956,21 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       }
     }
 
-    // Rule 3 & 4: Task date validation against subtasks
+    // Rule 3 & 4: Task date validation against subtasks (Actual)
     if (task.type !== 'project' && task.type !== 'milestone') {
       const childIds = gantt.getChildren(task.id);
-      if (childIds.length > 0 && task.status !== 'Not Started') {
-        const taskStart = getPlannedStartDate(task);
-        const taskEnd = getPlannedEndDate(task);
+      if (childIds.length > 0 && this.isTaskStarted(task)) {
+        const taskStart = getActualStartDate(task);
+        const taskEnd = getActualEndDate(task);
         if (taskStart && taskEnd) {
           const subStarts: Date[] = [];
           const subEnds: Date[] = [];
 
           childIds.forEach(cId => {
             const subState = getTaskState(cId);
-            if (subState.status !== 'Not Started') {
-              const ss = getPlannedStartDate(subState);
-              const se = getPlannedEndDate(subState);
+            if (this.isTaskStarted(subState)) {
+              const ss = getActualStartDate(subState);
+              const se = getActualEndDate(subState);
               if (ss) subStarts.push(ss);
               if (se) subEnds.push(se);
             }
@@ -939,24 +1070,6 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       }
     }
 
-    // Subtask checks against parent bounds
-    if (task.parent && task.parent !== rootId) {
-      const parentState = getTaskState(task.parent);
-      if (parentState.type !== 'project' && parentState.status !== 'Not Started' && task.status !== 'Not Started') {
-        const taskStart = getPlannedStartDate(task);
-        const taskEnd = getPlannedEndDate(task);
-        const parentStart = getPlannedStartDate(parentState);
-        const parentEnd = getPlannedEndDate(parentState);
-
-        if (taskStart && parentStart && taskStart < parentStart) {
-          errors.push(`ERR-009: Subtask planned start date cannot be earlier than parent task start date. (Subtask: ${this.formatDate(taskStart)}, Task: ${this.formatDate(parentStart)})`);
-        }
-        if (taskEnd && parentEnd && taskEnd > parentEnd) {
-          errors.push(`ERR-010: Subtask planned end date cannot be later than parent task end date. (Subtask: ${this.formatDate(taskEnd)}, Task: ${this.formatDate(parentEnd)})`);
-        }
-      }
-    }
-
     return errors;
   }
 
@@ -1050,16 +1163,60 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       // Auto-calculate derived properties to heal database out-of-sync values
       const derived = this.calculateDerivedValues(task);
 
+      // Populate eligible predecessors (both tasks and subtasks)
+      const candidates: any[] = [];
+      gantt.eachTask((t: any) => {
+        if (String(t.id) === String(task.id)) return;
+        if (t.type === 'project') return;
+        if (gantt.isChildOf(t.id, task.id)) return;
+        if (this.isTaskDependentOn(t.id, task.id)) return;
+
+        const isSubtask = t.parent && t.parent !== gantt.config.root_id;
+        let category = 'Task';
+        let parentName = '';
+        if (isSubtask) {
+          category = 'Subtask';
+          try {
+            const pTask = gantt.getTask(t.parent);
+            if (pTask) parentName = pTask.text;
+          } catch (e) {}
+        }
+
+        candidates.push({
+          id: String(t.id),
+          text: t.text,
+          category,
+          parentName,
+          status: t.status || 'Not Started',
+          type: t.type
+        });
+      });
+      this.eligiblePredecessors = candidates;
+
+      const currentPreds = this.getPredecessors(task);
+      const selectedPredecessorId = currentPreds.length > 0 ? String(currentPreds[0].id) : "";
+
+      const statusLower = (task.status || '').trim().toLowerCase();
+      const isUnstarted = statusLower === 'not started' || statusLower === 'to do' || statusLower === 'todo' || statusLower === 'planned' || statusLower === '';
+
       this.editingTask = {
         ...task,
         hasChildren,
-        status: task.status || 'In Progress',
-        progressPercent: derived.progressPercent,
-        Actual_start_date: task.type === 'project' || hasChildren ? (derived.Actual_start_date || "") : (task.Actual_start_date || (task.start_date ? (typeof task.start_date === 'string' ? task.start_date : this.formatDate(task.start_date)) : "")),
-        Actual_end_date: task.type === 'project' || hasChildren ? (derived.Actual_end_date || "") : (task.Actual_end_date || (task.end_date ? (typeof task.end_date === 'string' ? task.end_date : this.formatDate(task.end_date)) : "")),
-        Actual_duration: task.type === 'project' || hasChildren ? (derived.Actual_duration || 1) : (task.Actual_duration !== undefined ? task.Actual_duration : (task.duration || 1)),
-        Actual_crew: task.Actual_crew || task.actual_crew || 1,
-        Actual_cost: derived.Actual_cost,
+        selectedPredecessorId,
+        originalPredecessorId: selectedPredecessorId,
+        status: task.status || 'To Do',
+        progressPercent: isUnstarted ? 0 : derived.progressPercent,
+        Actual_start_date: task.type === 'project' || hasChildren 
+          ? (derived.Actual_start_date || "") 
+          : (isUnstarted ? (task.Actual_start_date || "") : (task.Actual_start_date || (task.start_date ? (typeof task.start_date === 'string' ? task.start_date : this.formatDate(task.start_date)) : ""))),
+        Actual_end_date: task.type === 'project' || hasChildren 
+          ? (derived.Actual_end_date || "") 
+          : (isUnstarted ? (task.Actual_end_date || "") : (task.Actual_end_date || (task.end_date ? (typeof task.end_date === 'string' ? task.end_date : this.formatDate(task.end_date)) : ""))),
+        Actual_duration: task.type === 'project' || hasChildren 
+          ? (derived.Actual_duration || 1) 
+          : (isUnstarted ? (task.Actual_duration || 0) : (task.Actual_duration !== undefined ? task.Actual_duration : (task.duration || 1))),
+        Actual_crew: isUnstarted ? (task.Actual_crew || 0) : (task.Actual_crew || task.actual_crew || 1),
+        Actual_cost: isUnstarted ? 0 : derived.Actual_cost,
         planned_start_date: task.type === 'project' || hasChildren ? (derived.planned_start_date || "") : (task.planned_start_date || (task.start_date ? (typeof task.start_date === 'string' ? task.start_date : this.formatDate(task.start_date)) : "")),
         planned_end_date: task.type === 'project' || hasChildren ? (derived.planned_end_date || "") : (task.planned_end_date || (task.end_date ? (typeof task.end_date === 'string' ? task.end_date : this.formatDate(task.end_date)) : "")),
         Planned_duration: task.type === 'project' || hasChildren ? (derived.Planned_duration || 1) : (task.Planned_duration !== undefined ? task.Planned_duration : (task.planned_duration || 1)),
@@ -1071,8 +1228,9 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       this.recalculateActualCost();
       this.recalculatePlannedCost();
       
-      this.editMode = 'actual';
+      this.editMode = isUnstarted ? 'planned' : 'actual';
       this.isModalOpen = true;
+      this.checkPredecessorConstraintInModal();
       this.cdr.detectChanges();
     });
   }
@@ -1107,32 +1265,73 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       
       const originalTask = gantt.getTask(this.editingTask.id);
       if (originalTask) {
+        // Handle Predecessor link update
+        const oldPredId = this.editingTask.originalPredecessorId;
+        const newPredId = this.editingTask.selectedPredecessorId;
+
+        if (oldPredId !== newPredId) {
+          // Remove old link(s) for this target
+          const targetLinks = [...(originalTask.$target || [])];
+          targetLinks.forEach((linkId: string | number) => {
+            try {
+              const link = gantt.getLink(linkId);
+              if (!newPredId || (link && String(link.source) === String(oldPredId))) {
+                gantt.deleteLink(linkId);
+              }
+            } catch (e) {}
+          });
+
+          // Add new link if selected
+          if (newPredId) {
+            try {
+              const newLinkId = 'link_' + Date.now();
+              gantt.addLink({
+                id: newLinkId,
+                source: newPredId,
+                target: originalTask.id,
+                type: "0"
+              });
+            } catch (e) {
+              console.error("Error adding predecessor link", e);
+            }
+          }
+        }
+
         originalTask.text = this.editingTask.text;
-        originalTask['status'] = this.editingTask.status || 'In Progress';
+        originalTask['status'] = this.editingTask.status || 'To Do';
         
-        if (this.editingTask.status === 'Not Started') {
-          originalTask.unscheduled = true;
-          delete originalTask.start_date;
-          delete originalTask.end_date;
-          originalTask.duration = 0;
+        const status = (this.editingTask.status || '').trim().toLowerCase();
+        const isUnstarted = status === 'not started' || status === 'to do' || status === 'todo' || status === 'planned';
+
+        if (isUnstarted) {
+          originalTask.unscheduled = false;
           originalTask.progress = 0;
           
           originalTask['Actual_start_date'] = "";
           originalTask['Actual_end_date'] = "";
           originalTask['Actual_duration'] = 0;
-          originalTask['planned_start_date'] = "";
-          originalTask['planned_end_date'] = "";
-          originalTask['Planned_duration'] = 0;
+          
+          originalTask['planned_start_date'] = this.editingTask.planned_start_date;
+          originalTask['planned_end_date'] = this.editingTask.planned_end_date;
+          originalTask['Planned_duration'] = this.editingTask.Planned_duration;
+          
+          const parsedStart = this.parseDate(this.editingTask.planned_start_date);
+          const parsedEnd = this.parseDate(this.editingTask.planned_end_date);
+          if (parsedStart && parsedEnd) {
+            originalTask.start_date = parsedStart;
+            originalTask.end_date = parsedEnd;
+            originalTask.duration = this.editingTask.Planned_duration;
+          }
           
           if (originalTask.type !== 'project' && originalTask.type !== 'milestone') {
             originalTask['Actual_crew'] = 0;
             originalTask['Actual_cost'] = 0;
-            originalTask['Planned_crew'] = 0;
-            originalTask['Planned_cost'] = 0;
+            originalTask['Planned_crew'] = this.editingTask.Planned_crew;
+            originalTask['Planned_cost'] = this.editingTask.Planned_cost;
             originalTask['actual_crew'] = 0;
             originalTask['actual_cost'] = 0;
-            originalTask['planned_crew'] = 0;
-            originalTask['planned_cost'] = 0;
+            originalTask['planned_crew'] = this.editingTask.Planned_crew;
+            originalTask['planned_cost'] = this.editingTask.Planned_cost;
           }
         } else {
           originalTask.unscheduled = false;
@@ -1184,6 +1383,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       this.editingTask.Actual_end_date = this.formatDate(end);
       this.recalculateActualCost();
     }
+    this.checkPredecessorConstraintInModal();
   }
 
   onActualDateChange() {
@@ -1194,6 +1394,7 @@ export class ProjectGantt implements AfterViewInit, OnInit {
       this.editingTask.Actual_duration = duration;
       this.recalculateActualCost();
     }
+    this.checkPredecessorConstraintInModal();
   }
 
   onActualCrewChange() {
@@ -1267,19 +1468,216 @@ export class ProjectGantt implements AfterViewInit, OnInit {
   }
 
   onStatusChange() {
-    if (this.editingTask && this.editingTask.status === 'Not Started') {
+    const status = (this.editingTask?.status || '').trim().toLowerCase();
+    const isUnstarted = status === 'not started' || status === 'to do' || status === 'todo' || status === 'planned';
+    
+    if (this.editingTask && isUnstarted) {
       this.editingTask.Actual_start_date = "";
       this.editingTask.Actual_end_date = "";
       this.editingTask.Actual_duration = 0;
-      this.editingTask.planned_start_date = "";
-      this.editingTask.planned_end_date = "";
-      this.editingTask.Planned_duration = 0;
       this.editingTask.progressPercent = 0;
       this.editingTask.Actual_crew = 0;
       this.editingTask.Actual_cost = 0;
-      this.editingTask.Planned_crew = 0;
-      this.editingTask.Planned_cost = 0;
     }
+
+    this.checkPredecessorConstraintInModal();
+  }
+
+  onPredecessorChange() {
+    this.checkPredecessorConstraintInModal();
+  }
+
+  onProgressChange() {
+    this.checkPredecessorConstraintInModal();
+  }
+
+  checkPredecessorConstraintInModal() {
+    if (!this.editingTask) return;
+    const pred = this.getSelectedPredecessor();
+    if (pred && !this.isPredecessorCompleted(pred)) {
+      if (this.isTaskStarted(this.editingTask)) {
+        this.activeErrors = [
+          `${GANTT_ERRORS.ERR_011.code}: Predecessor Constraint: Task/subtask "${this.editingTask.text}" cannot be started because its predecessor "${pred.text}" is not in Completed status (Current predecessor status: ${pred.status || 'Not Started'}).`
+        ];
+        return;
+      }
+    }
+
+    // Check parent task predecessor if editing a subtask
+    const rootId = gantt.config.root_id;
+    if (this.editingTask.parent && this.editingTask.parent !== rootId && this.isTaskStarted(this.editingTask)) {
+      try {
+        const parentTask = gantt.getTask(this.editingTask.parent);
+        if (parentTask && parentTask.type !== 'project') {
+          const parentPreds = this.getPredecessors(parentTask);
+          for (const pPred of parentPreds) {
+            if (!this.isPredecessorCompleted(pPred)) {
+              this.activeErrors = [
+                `${GANTT_ERRORS.ERR_011.code}: Predecessor Constraint: Subtask "${this.editingTask.text}" cannot be started because parent task "${parentTask.text}" has predecessor "${pPred.text}" that is not in Completed status (Current status: ${pPred.status || 'Not Started'}).`
+              ];
+              return;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    this.activeErrors = [];
+  }
+
+  getPredecessors(task: any): any[] {
+    if (!task) return [];
+    const predTasks: any[] = [];
+    const targetLinkIds = task.$target || [];
+    targetLinkIds.forEach((linkId: string | number) => {
+      try {
+        const link = gantt.getLink(linkId);
+        if (link && link.source) {
+          const sourceTask = gantt.getTask(link.source);
+          if (sourceTask) {
+            predTasks.push(sourceTask);
+          }
+        }
+      } catch (e) {}
+    });
+
+    if (predTasks.length === 0 && task.predecessor_ids && Array.isArray(task.predecessor_ids)) {
+      task.predecessor_ids.forEach((sId: any) => {
+        try {
+          const sourceTask = gantt.getTask(sId);
+          if (sourceTask) predTasks.push(sourceTask);
+        } catch (e) {}
+      });
+    }
+
+    return predTasks;
+  }
+
+  getPredecessorDisplay(task: any): string {
+    const preds = this.getPredecessors(task);
+    if (preds.length === 0) return "";
+    return preds.map(p => p.text).join(", ");
+  }
+
+  isTaskDependentOn(potentialPredId: string | number, currentTaskId: string | number): boolean {
+    const visited = new Set<string>();
+    const queue = [String(potentialPredId)];
+    while (queue.length > 0) {
+      const currId = queue.shift()!;
+      if (currId === String(currentTaskId)) return true;
+      if (visited.has(currId)) continue;
+      visited.add(currId);
+      try {
+        const t = gantt.getTask(currId);
+        if (t && t.$target) {
+          t.$target.forEach((lId: any) => {
+            const link = gantt.getLink(lId);
+            if (link && link.source) {
+              queue.push(String(link.source));
+            }
+          });
+        }
+      } catch (e) {}
+    }
+    return false;
+  }
+
+  getSelectedPredecessor(): any | null {
+    if (!this.editingTask || !this.editingTask.selectedPredecessorId) return null;
+    try {
+      return gantt.getTask(this.editingTask.selectedPredecessorId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  isPredecessorCompleted(predTask: any): boolean {
+    if (!predTask) return true;
+    const status = (predTask.status || '').trim().toLowerCase();
+    const progress = predTask.progressPercent !== undefined ? predTask.progressPercent : Math.round((predTask.progress || 0) * 100);
+
+    // If predecessor has children (it is a parent task), all of its children must be completed as well
+    const childIds = gantt.getChildren ? gantt.getChildren(predTask.id) : [];
+    if (childIds && childIds.length > 0) {
+      const allChildrenCompleted = childIds.every((cId: any) => {
+        try {
+          const child: any = gantt.getTask(cId);
+          const childStatus = (child['status'] || '').trim().toLowerCase();
+          const childProgress = child['progressPercent'] !== undefined ? child['progressPercent'] : Math.round((child.progress || 0) * 100);
+          return childStatus === 'completed' || childProgress >= 100;
+        } catch (e) {
+          return true;
+        }
+      });
+      if (!allChildrenCompleted) return false;
+    }
+
+    return status === 'completed' || progress >= 100;
+  }
+
+  isTaskStarted(task: any): boolean {
+    if (!task) return false;
+    const status = (task.status || '').trim().toLowerCase();
+    const isUnstartedStatus = 
+      status === 'not started' || 
+      status === 'to do' || 
+      status === 'todo' || 
+      status === 'planned' || 
+      status === '';
+
+    const progress = task.progressPercent !== undefined 
+      ? task.progressPercent 
+      : Math.round((task.progress || 0) * 100);
+
+    if (progress > 0) {
+      return true;
+    }
+
+    if (isUnstartedStatus) {
+      return false;
+    }
+
+    return true;
+  }
+
+  isPredecessorStarted(predTask: any): boolean {
+    if (!predTask) return true;
+    const status = (predTask.status || '').toLowerCase();
+    if (status === 'not started' || status === 'to do' || status === 'todo' || status === '') {
+      return false;
+    }
+    return true;
+  }
+
+  clearPredecessor() {
+    if (this.editingTask) {
+      this.editingTask.selectedPredecessorId = "";
+      this.onPredecessorChange();
+    }
+  }
+
+  removePredecessor(taskId: string | number, predId?: string | number) {
+    this.ngZone.run(() => {
+      const task = gantt.getTask(taskId);
+      if (!task) return;
+      const targetLinks = [...(task.$target || [])];
+      if (targetLinks.length === 0) return;
+
+      targetLinks.forEach((linkId: string | number) => {
+        try {
+          const link = gantt.getLink(linkId);
+          if (!predId || (link && String(link.source) === String(predId))) {
+            gantt.deleteLink(linkId);
+          }
+        } catch (e) {
+          console.error("Error deleting link", e);
+        }
+      });
+
+      gantt.updateTask(task.id);
+      this.recalculateProgressAndRender();
+      this.cdr.detectChanges();
+    });
   }
 
   recalculateProgressAndRender() {

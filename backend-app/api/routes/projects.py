@@ -267,6 +267,99 @@ async def save_project_plan(payload: SavePlanRequest, db: Session = Depends(get_
                     order_index=sub_dto.order_index or (s_idx + 1)
                 )
                 db.add(db_subtask)
+
+        db.flush()
+
+        # 3. Create TaskLink dependencies based on AI Plan predecessors
+        task_map_by_summary = {}
+        task_map_by_index = {}
+        subtask_map_by_summary = {}
+
+        # Fetch created tasks and subtasks for this project
+        created_tasks = db.query(Task).filter(Task.project_id == db_project.project_id).all()
+        for t in created_tasks:
+            task_map_by_summary[t.task_name.strip().lower()] = str(t.task_id)
+            if t.order_index:
+                task_map_by_index.setdefault(t.order_index, []).append(str(t.task_id))
+
+        created_subtasks = db.query(Subtask).join(Task).filter(Task.project_id == db_project.project_id).all()
+        for s in created_subtasks:
+            subtask_map_by_summary[s.subtask_name.strip().lower()] = str(s.subtask_id)
+
+        # Link tasks
+        for t_idx, task_dto in enumerate(plan.tasks):
+            curr_task_id = str(created_tasks[t_idx].task_id) if t_idx < len(created_tasks) else None
+            if not curr_task_id:
+                continue
+
+            preds = getattr(task_dto, "predecessors", []) or []
+            linked_any = False
+            for pred in preds:
+                pred_str = str(pred).strip()
+                source_id = None
+                if pred_str.lower() in task_map_by_summary:
+                    source_id = task_map_by_summary[pred_str.lower()]
+                elif pred_str.isdigit() and int(pred_str) in task_map_by_index:
+                    source_id = task_map_by_index[int(pred_str)][0]
+                else:
+                    for name_key, tid in task_map_by_summary.items():
+                        if pred_str.lower() in name_key or name_key in pred_str.lower():
+                            source_id = tid
+                            break
+
+                if source_id and source_id != curr_task_id:
+                    link = TaskLink(
+                        link_id=str(uuid.uuid4()),
+                        project_id=db_project.project_id,
+                        source_id=source_id,
+                        target_id=curr_task_id,
+                        link_type="0"
+                    )
+                    db.add(link)
+                    linked_any = True
+
+            # If no explicit predecessor was resolved and task order > 1, link to preceding group
+            curr_order = task_dto.order_index or (t_idx + 1)
+            if not linked_any and curr_order > 1:
+                prev_candidates = task_map_by_index.get(curr_order - 1)
+                if prev_candidates:
+                    prev_id = prev_candidates[0]
+                    if prev_id != curr_task_id:
+                        link = TaskLink(
+                            link_id=str(uuid.uuid4()),
+                            project_id=db_project.project_id,
+                            source_id=prev_id,
+                            target_id=curr_task_id,
+                            link_type="0"
+                        )
+                        db.add(link)
+
+            # Link subtasks within task
+            for s_idx, sub_dto in enumerate(task_dto.subtasks):
+                curr_sub_name = sub_dto.summary.strip().lower()
+                curr_sub_id = subtask_map_by_summary.get(curr_sub_name)
+                if not curr_sub_id:
+                    continue
+
+                sub_preds = getattr(sub_dto, "predecessors", []) or []
+                for sp in sub_preds:
+                    sp_str = str(sp).strip().lower()
+                    source_sub_id = subtask_map_by_summary.get(sp_str)
+                    if not source_sub_id:
+                        for s_name, sid in subtask_map_by_summary.items():
+                            if sp_str in s_name or s_name in sp_str:
+                                source_sub_id = sid
+                                break
+
+                    if source_sub_id and source_sub_id != curr_sub_id:
+                        s_link = TaskLink(
+                            link_id=str(uuid.uuid4()),
+                            project_id=db_project.project_id,
+                            source_id=source_sub_id,
+                            target_id=curr_sub_id,
+                            link_type="0"
+                        )
+                        db.add(s_link)
                 
         db.commit()
         return {"status": "success", "message": "Project plan saved successfully", "project_id": str(db_project.project_id)}
@@ -391,7 +484,20 @@ def get_project_gantt_data(project_id: str, db: Session = Depends(get_db)):
                     { "id": 6, "source": "p6", "target": "fab", "type": "0" },
                     { "id": 7, "source": "f4", "target": "p7", "type": "0" },
                     { "id": 8, "source": "p7", "target": "off", "type": "0" },
-                    { "id": 9, "source": "o2", "target": "o4", "type": "0" }
+                    { "id": 9, "source": "o2", "target": "o4", "type": "0" },
+                    # Sequential & task-level dependencies
+                    { "id": 10, "source": "e1", "target": "e2", "type": "0" },
+                    { "id": 11, "source": "e2", "target": "e3", "type": "0" },
+                    { "id": 12, "source": "e3", "target": "e4", "type": "0" },
+                    { "id": 13, "source": "p1", "target": "p2", "type": "0" },
+                    { "id": 14, "source": "p2", "target": "p3", "type": "0" },
+                    { "id": 15, "source": "f1", "target": "f2", "type": "0" },
+                    { "id": 16, "source": "f2", "target": "f3", "type": "0" },
+                    { "id": 17, "source": "o1", "target": "o2", "type": "0" },
+                    { "id": 18, "source": "o2", "target": "o3", "type": "0" },
+                    { "id": 19, "source": "c1", "target": "c2", "type": "0" },
+                    { "id": 20, "source": "c2", "target": "c3", "type": "0" },
+                    { "id": 21, "source": "c3", "target": "c4", "type": "0" }
                 ]
             }
             
@@ -478,7 +584,7 @@ def get_project_gantt_data(project_id: str, db: Session = Depends(get_db)):
             "progress": proj_progress,
             "open": True,
             "type": "project",
-            "status": project.status or "In Progress",
+            "status": project.status or "To Do",
             "unscheduled": not bool(proj_act_start_str),
             "Actual_start_date": proj_act_start_str,
             "Actual_end_date": proj_act_end_str,
@@ -500,6 +606,12 @@ def get_project_gantt_data(project_id: str, db: Session = Depends(get_db)):
             "planned_duration": proj_planned_duration
         })
         
+        # Fetch project links and map predecessors
+        task_links = db.query(TaskLink).filter(TaskLink.project_id == project_id).all()
+        pred_map = {}
+        for link in task_links:
+            pred_map.setdefault(str(link.target_id), []).append(str(link.source_id))
+
         for task in project.tasks:
             # 1. Start/End date strictly from actual fields
             t_act_start = task.actual_start_date
@@ -532,8 +644,9 @@ def get_project_gantt_data(project_id: str, db: Session = Depends(get_db)):
                 "progress": task_progress,
                 "open": True,
                 "type": "task",
-                "status": task.status or "In Progress",
+                "status": task.status or "To Do",
                 "unscheduled": not bool(task_start_str),
+                "predecessor_ids": pred_map.get(str(task.task_id), []),
                 "Actual_start_date": task.actual_start_date.strftime("%d-%m-%Y") if task.actual_start_date else "",
                 "Actual_end_date": task.actual_end_date.strftime("%d-%m-%Y") if task.actual_end_date else "",
                 "Actual_duration": t_dur if isinstance(t_dur, int) else 0,
@@ -580,8 +693,9 @@ def get_project_gantt_data(project_id: str, db: Session = Depends(get_db)):
                     "progress": float(sub.progress_percent or 0) / 100.0,
                     "open": True,
                     "type": "task",
-                    "status": sub.status or "In Progress",
+                    "status": sub.status or "To Do",
                     "unscheduled": not bool(sub_start_str),
+                    "predecessor_ids": pred_map.get(str(sub.subtask_id), []),
                     "Actual_start_date": sub.actual_start_date.strftime("%d-%m-%Y") if sub.actual_start_date else "",
                     "Actual_end_date": sub.actual_end_date.strftime("%d-%m-%Y") if sub.actual_end_date else "",
                     "Actual_duration": s_dur if isinstance(s_dur, int) else 0,
@@ -603,7 +717,6 @@ def get_project_gantt_data(project_id: str, db: Session = Depends(get_db)):
                     "actual_cost": float(sub.actual_cost or 0)
                 })
                 
-        task_links = db.query(TaskLink).filter(TaskLink.project_id == project_id).all()
         gantt_links = [{
             "id": str(link.link_id),
             "source": link.source_id,

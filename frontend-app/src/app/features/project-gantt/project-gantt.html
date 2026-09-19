@@ -11,6 +11,13 @@
       <button class="icon-btn" (click)="zoomOut()" title="Zoom Out"><mat-icon>remove_circle_outline</mat-icon></button>
       <button class="icon-btn" (click)="zoomIn()" title="Zoom In"><mat-icon>add_circle_outline</mat-icon></button>
       <div class="divider"></div>
+      <button class="view-btn" [class.active]="showPredecessors" (click)="togglePredecessors()"
+        title="Toggle Predecessor / Dependency Column">
+        <mat-icon
+          style="font-size: 18px; width: 18px; height: 18px; margin-right: 4px; vertical-align: middle;">account_tree</mat-icon>
+        {{ showPredecessors ? 'Hide Predecessors' : 'Show Predecessors' }}
+      </button>
+      <div class="divider"></div>
       <button class="view-btn" [class.active]="showMetrics" (click)="toggleMetrics()"
         title="Toggle Crew Allocation & Financial Columns">
         <mat-icon
@@ -70,9 +77,46 @@
         </select>
       </div>
 
+      <!-- Predecessor (Dependency) Selector -->
+      <div class="form-group" *ngIf="editingTask.type !== 'project'">
+        <label>
+          <span>Predecessor (Dependent On)</span>
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: normal; margin-left: 6px;">
+            Task/Subtask that must complete before this can start
+          </span>
+        </label>
+        <div class="predecessor-select-row">
+          <select [(ngModel)]="editingTask.selectedPredecessorId" (change)="onPredecessorChange()">
+            <option value="">-- None (No Predecessor) --</option>
+            <option *ngFor="let pred of eligiblePredecessors" [value]="pred.id">
+              {{ pred.category === 'Subtask' ? '↳ [Subtask]' : '📦 [Task]' }} {{ pred.text }}
+              {{ pred.parentName ? ' (under ' + pred.parentName + ')' : '' }} - {{ pred.status }}
+            </option>
+          </select>
+          <button type="button" class="btn-clear-pred" (click)="clearPredecessor()" *ngIf="editingTask.selectedPredecessorId" title="Remove Predecessor Dependency">
+            <mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle;">close</mat-icon>
+            Remove
+          </button>
+        </div>
+
+        <!-- Predecessor status helper & constraint callout -->
+        <div class="predecessor-info-pill" *ngIf="getSelectedPredecessor() as pred">
+          <div class="pred-info-header">
+            <span class="pred-label">Predecessor Status:</span>
+            <span class="pred-status-tag" [class.uncompleted]="!isPredecessorCompleted(pred)" [class.completed]="isPredecessorCompleted(pred)">
+              {{ pred.status || 'Not Started' }}
+            </span>
+          </div>
+          <div class="pred-rule-notice" *ngIf="!isPredecessorCompleted(pred)">
+            <mat-icon style="font-size: 14px; width: 14px; height: 14px; vertical-align: middle;">warning</mat-icon>
+            <span>Predecessor must be in <strong>Completed</strong> status before this task can be started. (Current status: {{ pred.status || 'Not Started' }})</span>
+          </div>
+        </div>
+      </div>
+
       <div class="form-group" *ngIf="editingTask.type !== 'project' && editingTask.type !== 'milestone'">
         <label>Progress (%)</label>
-        <input type="number" [(ngModel)]="editingTask.progressPercent" min="0" max="100" [disabled]="editingTask.hasChildren" />
+        <input type="number" [(ngModel)]="editingTask.progressPercent" (input)="onProgressChange()" (change)="onProgressChange()" min="0" max="100" [disabled]="editingTask.hasChildren" />
         <span *ngIf="editingTask.hasChildren" style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
           Calculated from subtasks average
         </span>

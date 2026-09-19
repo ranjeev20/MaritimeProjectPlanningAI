@@ -213,11 +213,14 @@ class EVMService:
             cum_ev_curr = 0.0
 
         # Standard EVM Formulas
-        cpi = cum_ev_curr / cum_ac_curr if cum_ac_curr > 0 else 1.0
-        spi = cum_ev_curr / cum_pv_curr if cum_pv_curr > 0 else 1.0
+       # cpi = cum_ev_curr / cum_ac_curr if cum_ac_curr > 0 else 1.0
+       # spi = cum_ev_curr / cum_pv_curr if cum_pv_curr > 0 else 1.0
+        cpi = cum_ev_curr / cum_ac_curr
+        spi = cum_ev_curr / cum_pv_curr
         cv = cum_ev_curr - cum_ac_curr
         sv = cum_ev_curr - cum_pv_curr
-        eac = project_bac / cpi if 0.0 < cpi < 1.0 else project_bac
+        # eac = project_bac / cpi if 0.0 < cpi < 1.0 else project_bac
+        eac = project_bac / cpi
         etc = eac - cum_ac_curr
         vac = project_bac - eac
 

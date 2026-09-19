@@ -62,6 +62,7 @@ class Subtask(BaseModel):
     planned_cost: Optional[float] = Field(default=0.0, description="Estimated budget cost for this subtask")
     actual_cost: Optional[float] = Field(default=0.0, description="Actual cost for this subtask")
     order_index: Optional[int] = Field(default=1, description="Execution order index (1, 2, 3...)")
+    predecessors: Optional[List[str]] = Field(default_factory=list, description="Titles/summaries or order indices of predecessor subtasks within this task")
 
 class Task(BaseModel):
     summary: str = Field(description="Title of the main task")
@@ -84,6 +85,7 @@ class Task(BaseModel):
     planned_cost: Optional[float] = Field(default=0.0, description="Estimated budget cost for this task")
     actual_cost: Optional[float] = Field(default=0.0, description="Actual cost for this task")
     order_index: Optional[int] = Field(default=1, description="Execution order index (1, 2, 3...)")
+    predecessors: Optional[List[str]] = Field(default_factory=list, description="Titles/summaries or order indices of predecessor tasks that must complete before this task can start")
 
 class ProjectPlan(BaseModel):
     project_title: str
@@ -156,6 +158,7 @@ class GanttTaskUpdate(BaseModel):
     Planned_duration: Optional[int] = None
     Planned_crew: Optional[int] = None
     Planned_cost: Optional[float] = None
+    predecessors: Optional[List[str]] = None
 
 class GanttLinkCreate(BaseModel):
     id: str | int

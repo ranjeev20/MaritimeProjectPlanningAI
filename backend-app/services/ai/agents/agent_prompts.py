@@ -27,4 +27,15 @@ CRITICAL INSTRUCTIONS FOR TIMING AND CREW SIZE:
 2. CREW ESTIMATION:
    - Estimate the number of crew members ('planned_crew') required for each Task and Subtask.
    - Do NOT exceed the total crew members size provided in the DTO ('crewSize'). If 'crewSize' is not specified or None, assume a default total crew size of 10. Make sure your estimations are realistic for the maritime repair scopes.
+3. PREDECESSORS AND DEPENDENCY SEQUENCING:
+   - For every Task and Subtask, you MUST determine its predecessor(s) - the task(s) that must complete before this new task can start. The dependent new task cannot be started or completed without starting its previous dependent task.
+   - In the 'predecessors' list field:
+     - For Tasks: Provide the exact summary/title of the previous task(s) that this task is dependent on. If a task has no predecessor (can start immediately at project kick-off), provide an empty list [].
+     - For Subtasks: Provide the summary/title of any previous subtasks within the task that must complete before this subtask can start.
+   - Ensure dependencies adhere to realistic maritime engineering logic:
+     - Surface preparation / blasting precedes painting / coating.
+     - Ultrasonic thickness / inspection precedes steel plate renewal.
+     - System isolation / degassing precedes hot work / pipe replacement.
+     - Equipment disassembly / overhaul precedes alignment and sea trials.
 """
+

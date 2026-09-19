@@ -6,19 +6,19 @@ export interface GanttError {
 export const GANTT_ERRORS = {
   ERR_001: {
     code: 'ERR-001',
-    message: 'Project planned start date cannot be earlier than the minimum planned start date of all its tasks.'
+    message: 'Project actual start date cannot be earlier than the minimum actual start date of all its tasks.'
   },
   ERR_002: {
     code: 'ERR-002',
-    message: 'Project planned end date cannot be later than the maximum planned end date of all its tasks.'
+    message: 'Project actual end date cannot be later than the maximum actual end date of all its tasks.'
   },
   ERR_003: {
     code: 'ERR-003',
-    message: 'Task planned start date cannot be earlier than the minimum planned start date of all its subtasks.'
+    message: 'Task actual start date cannot be earlier than the minimum actual start date of all its subtasks.'
   },
   ERR_004: {
     code: 'ERR-004',
-    message: 'Task planned end date cannot be later than the maximum planned end date of all its subtasks.'
+    message: 'Task actual end date cannot be later than the maximum actual end date of all its subtasks.'
   },
   ERR_005: {
     code: 'ERR-005',
@@ -35,5 +35,9 @@ export const GANTT_ERRORS = {
   ERR_008: {
     code: 'ERR-008',
     message: 'Project progress must equal the average progress of all its tasks.'
+  },
+  ERR_011: {
+    code: 'ERR-011',
+    message: 'Task/subtask cannot be started until its predecessor task/subtask is in Completed status.'
   }
 };
